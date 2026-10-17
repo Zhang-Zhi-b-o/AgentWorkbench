@@ -22,6 +22,19 @@
 
 .reader-notice{margin:0;padding:10px 12px;color:var(--muted);font-size:12.5px;text-align:center}
 
+/* 划词翻译结果：固定在底部，不遮挡阅读器工具栏，卡片内部自己滚动 */
+.sel-card{position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;transform:translateX(-50%);width:min(680px,calc(100vw - 24px));max-height:min(52vh,420px);display:flex;flex-direction:column;padding:11px 13px;border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--panel);box-shadow:0 8px 28px rgb(0 0 0 / 18%)}
+.sel-head{display:flex;flex:none;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.sel-head b{font-size:12.5px;font-weight:650}
+.sel-meta{margin-left:auto;overflow:hidden;color:var(--faint);font-size:11.5px;white-space:nowrap;text-overflow:ellipsis}
+.sel-close{flex:none;width:28px;height:28px;border:1px solid var(--line);border-radius:6px;background:var(--soft);color:var(--muted);font-size:15px;line-height:1;cursor:pointer}
+.sel-close:hover{background:var(--soft-2);color:var(--text)}
+.sel-text{flex:1;min-height:0;margin:9px 0 0;overflow-y:auto;color:var(--text);font-size:13.5px;line-height:1.72;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-overflow-scrolling:touch}
+.sel-text.is-error{color:var(--danger)}
+.sel-foot{display:flex;flex:none;align-items:center;gap:8px;margin-top:8px}
+.sel-src{color:var(--faint);font-size:11.5px}
+.sel-foot .text-button{margin-left:auto}
+
 /* 手机上 60 个分类按钮会把条目列表顶到屏幕外：分类压成一条可横滑的窄带，
    条目列表紧跟在下面。 */
 @media(max-width:720px){

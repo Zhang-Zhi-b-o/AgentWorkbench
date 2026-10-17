@@ -8,8 +8,8 @@
 <meta name="theme-color" content="#101613" media="(prefers-color-scheme: dark)">
 <title>Zotero 阅读 · 工作台</title>
 <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="../../app.css?v=7">
-<link rel="stylesheet" href="./app.css?v=7">
+<link rel="stylesheet" href="../../app.css?v=8">
+<link rel="stylesheet" href="./app.css?v=8">
 </head>
 <body>
 <div class="zotero-app">
@@ -54,16 +54,6 @@
 <section class="section"><h3>摘要</h3><p class="abstract" id="detailAbstract"></p></section>
 <section class="section"><h3>PDF 全文</h3><div class="pdfs" id="pdfList"></div></section>
 </article>
-<aside class="trans" aria-labelledby="translateTitle">
-<div class="trans-head"><h2 id="translateTitle">翻译</h2><span class="config" id="translationConfig">读取中</span></div>
-<div class="trans-state"><p id="translationHint"></p><button class="text-button" id="retryTranslationConfig" type="button" hidden>重试</button></div>
-<label class="field" for="translateText">待翻译文本</label>
-<textarea id="translateText" maxlength="12000" rows="6" placeholder="粘贴需要翻译的段落，最多 12000 个字符"></textarea>
-<div class="count"><span id="charCount">0 / 12000</span></div>
-<div class="controls"><label><span>目标语言</span><select id="targetLang"><option value="zh">中文</option><option value="en">English</option></select></label><button class="button primary" id="translateBtn" type="button" disabled>翻译</button></div>
-<div class="alert" id="translationError" role="alert" hidden><div><b>翻译失败</b><p id="translationErrorText"></p></div><button class="button small" id="retryTranslation" type="button">重试</button></div>
-<div class="output" id="translationOutput" hidden><div class="out-head"><span>译文</span><span id="translationModel"></span></div><span class="cache" id="cacheBadge" hidden>缓存命中</span><p class="translation" id="translationText"></p><button class="text-button" id="toggleTranslation" type="button" hidden>展开全部</button></div>
-</aside>
 </div>
 </div>
 </section>
@@ -73,6 +63,11 @@
 </section>
 </main>
 </div>
-<script src="./app.js?v=7" defer></script>
+<aside class="sel-card" id="selCard" role="dialog" aria-label="划词翻译" hidden>
+<div class="sel-head"><b>划词翻译</b><span class="sel-meta" id="selMeta"></span><button class="sel-close" id="selClose" type="button" aria-label="关闭译文">×</button></div>
+<p class="sel-text" id="selText" aria-live="polite"></p>
+<div class="sel-foot"><span class="sel-src" id="selSource"></span><button class="text-button" id="selToggle" type="button" hidden>展开全部</button></div>
+</aside>
+<script src="./app.js?v=8" defer></script>
 </body>
 </html>

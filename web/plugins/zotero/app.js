@@ -13,18 +13,14 @@
   const DC = $('detailContent'), DB = $('detailBack'), DT = $('detailTitle'), DA = $('detailAuthors');
   const DP = $('detailPublication'), DD = $('detailDate'), DOI = $('detailDoi'), DTags = $('detailTags');
   const DAb = $('detailAbstract'), PL = $('pdfList');
-  const TC = $('translationConfig'), RTC = $('retryTranslationConfig'), TH = $('translationHint');
-  const TA = $('translateText'), CC = $('charCount'), TL = $('targetLang'), TB = $('translateBtn');
-  const TE = $('translationError'), TET = $('translationErrorText'), RT = $('retryTranslation');
-  const TO = $('translationOutput'), TM = $('translationModel'), CB = $('cacheBadge');
-  const TX = $('translationText'), TT = $('toggleTranslation');
+  const CARD = $('selCard'), CARD_META = $('selMeta'), CARD_TEXT = $('selText');
+  const CARD_SRC = $('selSource'), CARD_CLOSE = $('selClose'), CARD_MORE = $('selToggle');
   const RH = $('readerHost');
 
   let view = 'library', colls = [], coll = '', q = '', items = [], total = 0, next = 0;
   let seq = 0, labort = null, loading = false, scroll = 0, searchTimer = 0;
   let key = null, pdfs = [], dseq = 0, dabort = null, cabort = null;
-  let configured = false, translating = false, tabort = null, tval = '', tmodel = '', tcached = false, texp = false;
-  let cabort2 = null, frame = null;
+  let frame = null;
 
   const mk = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -297,7 +293,7 @@
     if (!itemKey) return;
     scroll = L.scrollTop;
     key = itemKey;
-    resetTranslation();
+    selClose();
     setView('detail');
     focus(BB);
     loadDetail();
@@ -306,7 +302,7 @@
     if (dabort) dabort.abort();
     dabort = null;
     dseq += 1;
-    resetTranslation();
+    selClose();
     setView('library');
     const active = key;
     requestAnimationFrame(() => {
@@ -316,119 +312,79 @@
     });
   }
 
-  /* 翻译 */
-  function updateTranslateButton() {
-    const value = TA.value;
-    TB.disabled = !configured || translating || !value.trim() || value.length > 12000;
-    TB.textContent = translating ? '翻译中…' : '翻译';
+  /* 划词翻译：在阅读器里选中文字 → 弹层多出一个「翻译」→ 译文落在底部卡片。
+     不再有手动输入框；唯一入口就是选区。 */
+  let selText = '', selExpanded = false, selAbort = null, popupWin = null;
+
+  function selDraw(isError) {
+    const chars = Array.from(selText);
+    CARD_TEXT.textContent = selExpanded ? selText : chars.slice(0, LIMIT).join('');
+    CARD_TEXT.classList.toggle('is-error', !!isError);
+    CARD_MORE.hidden = !!isError || chars.length <= LIMIT;
+    CARD_MORE.textContent = selExpanded ? '收起' : '展开全部';
   }
-  function updateCount() {
-    CC.textContent = TA.value.length + ' / 12000';
-    updateTranslateButton();
+  function selClose() {
+    if (selAbort) selAbort.abort();
+    selAbort = null;
+    CARD.hidden = true;
   }
-  async function loadConfig() {
-    if (cabort2) cabort2.abort();
+  async function translateSelection(text, source) {
+    const value = str(text).trim();
+    if (!value) return;
+    if (selAbort) selAbort.abort();
     const controller = new AbortController();
-    cabort2 = controller;
-    configured = false;
-    TC.textContent = '读取中';
-    TC.dataset.state = '';
-    TH.textContent = '正在检查翻译服务配置。';
-    RTC.hidden = true;
-    updateTranslateButton();
-    try {
-      const data = await read(await request('/api/zotero/translation', {
-        headers: { Accept: 'application/json' }, signal: controller.signal
-      }));
-      if (cabort2 !== controller) return;
-      if (data.configured === true) {
-        configured = true;
-        TC.textContent = '翻译就绪';
-        TC.dataset.state = 'ready';
-        const bits = [str(data.provider), str(data.model)].filter(Boolean);
-        TH.textContent = bits.length ? '服务：' + bits.join(' · ') : '翻译服务已就绪。';
-      } else {
-        TC.textContent = '未配置';
-        TC.dataset.state = 'error';
-        TH.textContent = '服务端尚未配置翻译模型，暂时无法使用翻译。';
-      }
-    } catch (error) {
-      if (error.name === 'AbortError' || cabort2 !== controller) return;
-      TC.textContent = '不可用';
-      TC.dataset.state = 'error';
-      TH.textContent = '翻译服务不可用：' + friendly(error);
-      RTC.hidden = false;
-    } finally {
-      if (cabort2 === controller) cabort2 = null;
-      updateTranslateButton();
-    }
-  }
-  function resetTranslation() {
-    if (tabort) tabort.abort();
-    tabort = null;
-    translating = false;
-    tval = '';
-    tmodel = '';
-    tcached = false;
-    texp = false;
-    TA.value = '';
-    TE.hidden = true;
-    TET.textContent = '';
-    TO.hidden = true;
-    TX.textContent = '';
-    TM.textContent = '';
-    CB.hidden = true;
-    TT.hidden = true;
-    TT.textContent = '展开全部';
-    updateCount();
-  }
-  function renderTranslation() {
-    const chars = Array.from(tval);
-    TX.textContent = texp ? tval : chars.slice(0, LIMIT).join('');
-    TM.textContent = tmodel ? '模型：' + tmodel : '模型：未提供';
-    CB.hidden = !tcached;
-    TT.hidden = chars.length <= LIMIT;
-    TT.textContent = texp ? '收起译文' : '展开全部';
-    TO.hidden = false;
-  }
-  function showTranslationError(message) {
-    TE.hidden = false;
-    TET.textContent = message;
-  }
-  async function translate() {
-    if (translating) return;
-    const value = TA.value;
-    if (!configured) return showTranslationError('翻译服务尚未配置，暂时无法翻译。');
-    if (!value.trim()) return showTranslationError('请先输入需要翻译的文本。');
-    if (value.length > 12000) return showTranslationError('文本超过 12000 个字符，请删减后再试。');
-    if (tabort) tabort.abort();
-    const controller = new AbortController();
-    tabort = controller;
-    translating = true;
-    TE.hidden = true;
-    updateTranslateButton();
+    selAbort = controller;
+    CARD.hidden = false;
+    CARD_SRC.textContent = source || '';
+    CARD_META.textContent = '翻译中…';
+    selText = '正在翻译…';
+    selExpanded = false;
+    selDraw(false);
     try {
       const data = await read(await request('/api/zotero/translate', {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Workbench': '1' },
-        body: JSON.stringify({ text: value, target: TL.value, extraPrompt: '' }),
+        // 中文选区译成英文，其余译成中文。
+        body: JSON.stringify({ text: value.slice(0, 12000),
+          target: /[\u4e00-\u9fff]/.test(value) ? 'en' : 'zh', extraPrompt: '' }),
         signal: controller.signal
       }, 90000));
+      if (selAbort !== controller) return;
       if (typeof data.translation !== 'string') throw new APIError('翻译接口没有返回译文，请稍后重试。', 0, 'bad');
-      tval = data.translation;
-      tmodel = str(data.model);
-      tcached = data.cached === true;
-      texp = false;
-      renderTranslation();
+      selText = data.translation;
+      selExpanded = false;
+      CARD_META.textContent = [str(data.model), data.cached === true ? '缓存命中' : ''].filter(Boolean).join(' · ');
+      selDraw(false);
     } catch (error) {
-      if (error.name !== 'AbortError') showTranslationError(friendly(error));
+      if (error.name === 'AbortError' || selAbort !== controller) return;
+      selText = friendly(error);
+      CARD_META.textContent = '';
+      selDraw(true);
     } finally {
-      if (tabort === controller) {
-        tabort = null;
-        translating = false;
-        updateTranslateButton();
-      }
+      if (selAbort === controller) selAbort = null;
     }
+  }
+  // 阅读器是官方构建，只暴露一个 customEvent 钩子：勾住渲染选区弹层的时机，
+  // 把自己造的按钮塞进去。文字来自 params.annotation.text。
+  function bindSelectionPopup(win, doc) {
+    if (!win || popupWin === win) return;
+    popupWin = win;
+    win.addEventListener('customEvent', (event) => {
+      const detail = event && event.detail;
+      if (!detail || detail.type !== 'renderTextSelectionPopup') return;
+      const annotation = (detail.params && detail.params.annotation) || {};
+      const selected = str(annotation.text);
+      if (!selected || typeof detail.append !== 'function') return;
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.textContent = '翻译';
+      button.setAttribute('data-workbench', 'translate');
+      button.style.cssText = 'margin:4px 6px;padding:4px 10px;border-radius:6px;'
+        + 'border:1px solid rgba(127,127,127,.45);background:transparent;color:inherit;'
+        + 'font:inherit;cursor:pointer';
+      button.addEventListener('click', () => translateSelection(selected, '选中文字'));
+      detail.append(button);
+    });
   }
 
   /* PDF 阅读器
@@ -455,6 +411,7 @@
       readerStatus('正在加载阅读器…');
       if (typeof win.createReader !== 'function') throw new Error('官方阅读器未就绪，请重试。');
       doc.documentElement.lang = 'zh-CN';
+      bindSelectionPopup(win, doc);
       const ftl = await Promise.all(['zotero', 'reader', 'brand'].map(async (name) => {
         const response = await fetch('/zotero-reader/locales/zh-CN/' + name + '.ftl');
         if (!response.ok) throw new Error('中文界面资源加载失败。');
@@ -581,22 +538,18 @@
   DB.addEventListener('click', backToList);
   RD.addEventListener('click', loadDetail);
   RC.addEventListener('click', loadCollections);
-  RTC.addEventListener('click', loadConfig);
   PL.addEventListener('click', (event) => {
     const button = event.target.closest('.pdf-button');
     if (button && pdfs[Number(button.dataset.pdf)]) openReader(Number(button.dataset.pdf));
   });
-  TA.addEventListener('input', updateCount);
-  TB.addEventListener('click', translate);
-  RT.addEventListener('click', translate);
-  TT.addEventListener('click', () => {
-    texp = !texp;
-    renderTranslation();
+  CARD_CLOSE.addEventListener('click', selClose);
+  CARD_MORE.addEventListener('click', () => {
+    selExpanded = !selExpanded;
+    selDraw(false);
   });
 
   DT.setAttribute('tabindex', '-1');
   setView('library');
   loadCollections();
-  loadConfig();
   loadItems(true);
 })();
