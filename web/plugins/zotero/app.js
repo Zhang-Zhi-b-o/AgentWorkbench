@@ -5,7 +5,7 @@
   const PAGE = 25, LIMIT = 6000, READER = '/zotero-reader/reader.html';
   const L = $('libraryView'), DV = $('detailView'), RV = $('readerView'), BB = $('backBtn');
   const CL = $('collectionList'), CE = $('collectionError'), CET = $('collectionErrorText'), RC = $('retryCollections');
-  const SI = $('searchInput'), CS = $('clearSearch'), LS = $('listSummary');
+  const SI = $('searchInput');
   const LE = $('listError'), LET = $('listErrorText'), RL = $('retryList'), LK = $('listSkeleton');
   const IL = $('itemList'), ES = $('emptyState'), ET = $('emptyTitle'), EX = $('emptyText');
   const LW = $('loadMoreWrap'), LM = $('loadMore');
@@ -21,10 +21,10 @@
   const RH = $('readerHost');
 
   let view = 'library', colls = [], coll = '', q = '', items = [], total = 0, next = 0;
-  let seq = 0, labort = null, loading = false, scroll = 0, retryMode = 'reset', searchTimer = 0;
+  let seq = 0, labort = null, loading = false, scroll = 0, searchTimer = 0;
   let key = null, pdfs = [], dseq = 0, dabort = null, cabort = null;
   let configured = false, translating = false, tabort = null, tval = '', tmodel = '', tcached = false, texp = false;
-  let cabort2 = null, frame = null, readerReady = false;
+  let cabort2 = null, frame = null;
 
   const mk = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -133,9 +133,6 @@
       }
     }
   }
-  function updateSummary() {
-    LS.textContent = items.length ? '共 ' + total + ' 条 · 已显示 ' + items.length : '共 ' + total + ' 条';
-  }
   function showEmpty() {
     ES.hidden = false;
     ET.textContent = q ? '没有匹配的条目' : '此分类还没有条目';
@@ -179,7 +176,6 @@
       next = 0;
       IL.replaceChildren();
       LK.hidden = false;
-      LS.textContent = '正在读取条目…';
     } else {
       LM.disabled = true;
       LM.textContent = '加载中…';
@@ -201,12 +197,10 @@
       const returned = Number(data.start);
       next = (Number.isFinite(returned) ? returned : start) + PAGE;
       drawItems();
-      updateSummary();
       LK.hidden = true;
       IL.setAttribute('aria-busy', 'false');
       LW.hidden = !(page.length > 0 && next < total);
       if (!items.length) showEmpty();
-      retryMode = reset ? 'reset' : 'append';
     } catch (error) {
       if (error.name === 'AbortError' || current !== seq) return;
       LK.hidden = true;
@@ -218,10 +212,8 @@
         items = [];
         total = 0;
         IL.replaceChildren();
-        LS.textContent = '读取失败';
         ES.hidden = true;
       }
-      retryMode = reset ? 'reset' : 'append';
     } finally {
       if (current === seq) {
         loading = false;
@@ -233,16 +225,8 @@
 
   /* 条目详情 */
   function doiUrl(raw) {
-    let value = raw.trim();
-    if (/^https?:\/\//i.test(value)) {
-      try {
-        const url = new URL(value);
-        if (!/(^|\.)doi\.org$/i.test(url.hostname)) return null;
-        value = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
-      } catch (_) { return null; }
-    }
-    if (!/^10\.\d{4,9}\/.+/i.test(value)) return null;
-    return 'https://doi.org/' + value.split('/').map(encodeURIComponent).join('/');
+    const value = raw.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+    return value ? 'https://doi.org/' + encodeURI(value) : null;
   }
   function drawDetail(data) {
     DT.textContent = str(data.title) || '无标题';
@@ -251,7 +235,7 @@
     DD.textContent = str(data.date) || '—';
     DOI.replaceChildren();
     const doi = str(data.doi).trim();
-    const href = doi ? doiUrl(doi) : null;
+    const href = doiUrl(doi);
     if (!doi) DOI.textContent = '—';
     else if (!href) DOI.textContent = doi;
     else {
@@ -453,13 +437,11 @@
     frame.className = 'reader-frame';
     frame.title = 'PDF 阅读器';
     frame.src = READER;
-    frame.addEventListener('load', () => { readerReady = true; });
     RH.append(frame);
   }
   function openReader() {
     setView('reader');
     if (!frame) mountReader();
-    frame.hidden = !readerReady;
     focus(BB);
   }
   function closeReader() {
@@ -488,7 +470,6 @@
   });
   SI.addEventListener('input', () => {
     q = SI.value.trim();
-    CS.hidden = !SI.value;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => loadItems(true), 320);
   });
@@ -500,15 +481,7 @@
       loadItems(true);
     }
   });
-  CS.addEventListener('click', () => {
-    SI.value = '';
-    q = '';
-    CS.hidden = true;
-    clearTimeout(searchTimer);
-    loadItems(true);
-    focus(SI);
-  });
-  RL.addEventListener('click', () => loadItems(retryMode !== 'append'));
+  RL.addEventListener('click', () => loadItems(items.length === 0));
   LM.addEventListener('click', () => loadItems(false));
   IL.setAttribute('role', 'list');
   IL.addEventListener('click', (event) => {

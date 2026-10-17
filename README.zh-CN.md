@@ -84,6 +84,9 @@ Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必
 
 监听端口用 `WORKBENCH_PORT` 覆盖。
 
+从旧版本迁过来？跑 `sync-data.ps1`：它把 DSH 的对话与运行时搬过来，并重建约 500 个
+目录联接——直接复制要么顺着联接把 690 MB 展开成几个 G，要么丢掉联接让 DSH 的插件加载失败。
+
 ### `plugins.json`
 
 ```json

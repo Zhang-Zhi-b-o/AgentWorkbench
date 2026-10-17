@@ -94,6 +94,10 @@ the platform data directory (`%LOCALAPPDATA%\AgentWorkbench`,
 
 Override the listen port with `WORKBENCH_PORT`.
 
+Moving an existing installation? `sync-data.ps1` brings the DSH conversations and
+runtime across, including the ~500 directory junctions that a plain copy would
+either follow (and explode) or drop (and break the plugin loader).
+
 ### `plugins.json`
 
 ```json

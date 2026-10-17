@@ -7,7 +7,7 @@
   const count = $('pluginCount'), errorBox = $('loadError'), errorText = $('loadErrorText');
   const toggle = $('navToggle'), toggleLabel = $('navToggleLabel'), navBox = $('pluginNav');
   const S = { plugins: [], byId: new Map(), views: new Map(), loaded: false };
-  let collapsed = readCollapsed(), homeScroll = 0;
+  let collapsed = readCollapsed();
 
   function readCollapsed() {
     try { return localStorage.getItem(KEY) === '1'; } catch (_) { return false; }
@@ -191,7 +191,6 @@
     hideViews();
     markActive(null);
     document.title = '工作台';
-    home.scrollTop = homeScroll;
   }
   function ensureView(plugin) {
     if (S.views.has(plugin.id)) return S.views.get(plugin.id);
@@ -204,24 +203,13 @@
     frame.src = entryOf(plugin.entry);
     frame.referrerPolicy = 'same-origin';
     frame.hidden = true;
-    const status = el('div', 'frame-status');
-    const spinner = el('span', 'spinner');
-    spinner.setAttribute('aria-hidden', 'true');
-    const label = el('span', '', '正在载入 ' + nameOf(plugin) + '…');
-    status.append(spinner, label);
-    frame.addEventListener('load', () => { status.hidden = true; });
-    frame.addEventListener('error', () => {
-      spinner.hidden = true;
-      label.textContent = nameOf(plugin) + ' 页面载入失败';
-    });
-    section.append(frame, status);
+    section.append(frame);
     views.append(section);
-    const view = { section, frame, status };
+    const view = { section, frame };
     S.views.set(plugin.id, view);
     return view;
   }
   function showPlugin(plugin) {
-    homeScroll = home.scrollTop;
     ensureView(plugin);
     home.hidden = true;
     views.hidden = false;

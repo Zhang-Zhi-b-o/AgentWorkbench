@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Publish the workbench on the tailnet, once.
 
