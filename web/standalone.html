@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- 插件独立页：地址栏直接打开某个插件时，套上工作台顶栏（插件标签 + 收起键），
+     插件自己的页面放进 iframe。壳里已经带栏，所以宿主只在「浏览器标签页」导航时
+     发这一页（server.py 的 wants_standalone），壳内的 iframe 拿到的仍是插件原文。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151517" media="(prefers-color-scheme: dark)">
+<title>插件 · 工作台</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css?v=10">
+<!-- 收起状态要在首帧之前就落到 <html> 上，否则会先闪一屏整条顶栏再缩下去。 -->
+<script>try{if(localStorage.getItem('workbench.nav-collapsed')==='1')document.documentElement.classList.add('nav-collapsed')}catch(_){}</script>
+</head>
+<body>
+<a class="skip-link" href="#content">跳到主要内容</a>
+<div class="app">
+<header class="topbar"><div class="topbar-inner">
+<a class="brand" href="/" aria-label="工作台首页"><img class="brand-mark" src="/favicon.svg" width="34" height="34" alt=""><b>工作台</b></a>
+<nav class="plugin-nav" id="pluginNav" aria-label="插件导航" aria-busy="true">
+<div class="nav-tabs" id="navTabs"><span class="nav-skeleton" aria-hidden="true"></span><span class="nav-skeleton" aria-hidden="true"></span><span class="nav-skeleton short" aria-hidden="true"></span></div>
+</nav>
+<button class="nav-toggle" id="navToggle" type="button" aria-expanded="true" aria-controls="pluginNav" aria-label="收起插件导航" title="收起插件导航"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5 12 15.5l6-6"/></svg></button>
+</div></header>
+<main class="main" id="content" tabindex="-1">
+<div class="plugin-views" id="pluginViews" hidden>
+<section class="plugin-view" id="pluginView">
+<iframe class="plugin-frame" id="pluginFrame" title="插件" src="about:blank"></iframe>
+</section>
+</div>
+<div class="empty-state" id="viewError" role="alert" hidden><b id="viewErrorTitle">无法打开这个插件</b><p id="viewErrorText"></p></div>
+</main>
+</div>
+<script src="/standalone.js?v=10" defer></script>
+</body>
+</html>

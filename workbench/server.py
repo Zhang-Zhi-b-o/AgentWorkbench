@@ -4,9 +4,10 @@ The host knows nothing about any specific plugin.  Request order is:
 
 1. reject a foreign ``Host`` / ``Origin``,
 2. answer the two meta routes (``/api/health``, ``/api/plugins``),
-3. hand the path to the plugin whose manifest claims it (longest prefix wins),
-4. serve ``web/`` as static files,
-5. otherwise report 404.
+3. wrap a plugin's own URL in the workbench bar when a browser tab opens it,
+4. hand the path to the plugin whose manifest claims it (longest prefix wins),
+5. serve ``web/`` as static files,
+6. otherwise report 404.
 
 Mutating requests need the shared header before any of that, so a hostile page
 cannot drive a plugin through the user's own browser.
@@ -25,6 +26,13 @@ from .errors import WorkbenchError
 from .http import Request
 
 _TOO_LARGE = object()
+
+# A plugin's own URL opened in a browser tab is served inside the workbench bar,
+# so ``/vscode/`` and ``/plugins/zotero/`` carry the same top bar as the shell.
+# ``Sec-Fetch-Dest`` is the browser's own statement of what a navigation is for,
+# and it draws exactly the line needed here: ``document`` is a tab, ``iframe`` is
+# a frame -- and a frame is already inside the bar, so only a tab is wrapped.
+_STANDALONE_PAGE = "/standalone.html"
 
 # A content-hashed asset can be cached forever: its URL changes with its bytes.
 _HASHED_ASSET = re.compile(
@@ -45,6 +53,19 @@ def cache_policy(name: str) -> str:
     if _HASHED_ASSET.search(name):
         return "public, max-age=31536000, immutable"
     return "no-cache"
+
+
+def wants_standalone(dest, path: str, entries) -> bool:
+    """True when a browser tab is opening one of the plugins' own entry URLs.
+
+    A missing or different ``Sec-Fetch-Dest`` means this is not a top-level
+    navigation -- a frame, a fetch, or a client that does not send the header --
+    and those keep getting the plugin's own document, unwrapped.
+    """
+    if (dest or "").strip().lower() != "document":
+        return False
+    wanted = (path or "").rstrip("/") or "/"
+    return any((entry or "").rstrip("/") == wanted for entry in entries)
 
 
 def safe_static_path(root: Path, path: str) -> Path | None:
@@ -118,6 +139,11 @@ class Handler(BaseHTTPRequestHandler):
                                           "version": __version__})
             if method == "GET" and path == "/api/plugins":
                 return request.json(200, self.server.registry.manifests())
+
+            if method == "GET" and wants_standalone(
+                    self.headers.get("Sec-Fetch-Dest"), path,
+                    (item.entry for item in self.server.registry.plugins if item.ready())):
+                return self._serve_static(request, _STANDALONE_PAGE)
 
             owner = self.server.registry.match(path)
             if owner is not None and owner.handle(request):
