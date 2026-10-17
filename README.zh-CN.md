@@ -2,15 +2,19 @@
 
 [English](README.md) · **简体中文**
 
+[![tests](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml)
+
 一个自托管的随身工作台：把「远程用自己那台电脑」变成打开一个网页。宿主只做插件目录与
 转发，每个工具一个独立插件。为**私有网络（Tailscale）**和**慢速、高延迟链路**而设计。
+
+![工作台外壳：三个插件，全部就绪](docs/screenshot.png)
 
 自带三个插件：
 
 | 插件 | 做什么 | 需要电脑上有什么 |
 |---|---|---|
-| `agents` | 完整的 DSH 对话工作区，可接入 Codex 与 Claude Code | `node` + 一个 DeepSeek API key |
-| `zotero` | 浏览 Zotero 书库、读 PDF、划词翻译 | Zotero 桌面端 |
+| `agents` | 完整的 DSH 对话工作区，可接入 Codex 与 Claude Code | `node` 18+、DSH 运行时（一条 `npm install`，见下文）、一个 DeepSeek API key |
+| `zotero` | 浏览 Zotero 书库、读 PDF、划词翻译 | Zotero 桌面端；划词翻译还要装 *Translate for Zotero* 插件并配好自定义 GPT / ChatGPT 服务 |
 | `vscode` | 在壳内用 VS Code Web 写代码，顶栏导航一直可用 | VS Code CLI（`code`） |
 
 第四个插件就是一个放两个文件的文件夹。宿主从不按名字 import 插件、也不看插件内部，
@@ -42,13 +46,17 @@
 ## 环境要求
 
 - Python 3.10+（宿主和所有自带插件只用标准库）
-- 按插件可选：`node` 与 DSH 运行时（agents）、Zotero 桌面端（zotero）、
+- 按插件可选：`node` 18+ 与 DSH 运行时（agents）、Zotero 桌面端（zotero）、
   VS Code CLI（vscode）
+
+宿主是纯 Python，测试在 CI 上同时跑 Windows 与 Linux；但日常使用是 Windows：启动器与
+远程访问脚本是 PowerShell，`zotero` / `vscode` 两个插件也按 Windows 的安装位置查找。
+Linux 或 macOS 上宿主和外壳能跑，这两个插件会说明自己缺什么。
 
 ## 启动
 
 ```bash
-git clone <本仓库> AgentWorkbench
+git clone https://github.com/Zhang-Zhi-b-o/AgentWorkbench.git
 cd AgentWorkbench
 python -m workbench
 ```
@@ -64,9 +72,31 @@ AgentWorkbench listening on http://127.0.0.1:8768
   zotero    iframe   /plugins/zotero/   ready
 ```
 
-没有别的准备工作：缺依赖的插件只会显示 `not available`、卡片置灰，其余照常工作。
+缺依赖的插件显示 `not available`：卡片置灰，并直接说明缺什么，其余插件照常工作。
 
 Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必要时后台启动再打开浏览器。
+
+### 安装 DSH 运行时（`agents` 插件）
+
+`agents` 驱动本机的 DSH，不捆绑运行时。在仓库根目录装一次：
+
+```powershell
+# Windows PowerShell
+New-Item -ItemType Directory -Force data | Out-Null
+npm install --prefix "$PWD\data\dsh-runtime" @deepseek-ai/dsh
+```
+
+```bash
+# macOS / Linux
+mkdir -p data
+npm install --prefix "$PWD/data/dsh-runtime" @deepseek-ai/dsh
+```
+
+先建 `data/` 同时也把 `WORKBENCH_HOME` 钉在这个仓库上（见下文），运行时就会落在插件
+查找的那个位置。数据目录放在别处的话，装到 `$WORKBENCH_HOME/dsh-runtime` 即可。
+
+之后还需要一个 DeepSeek API key，见 [DeepSeek key](#deepseek-key)。这两样缺任何一个，
+置灰的卡片和 `/agents/` 返回的 `503` 都会打印你这台机器上该跑的那条命令，不用自己猜路径。
 
 ## 配置
 
@@ -84,8 +114,9 @@ Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必
 
 监听端口用 `WORKBENCH_PORT` 覆盖。
 
-从旧版本迁过来？跑 `sync-data.ps1`：它把 DSH 的对话与运行时搬过来，并重建约 500 个
-目录联接——直接复制要么顺着联接把 690 MB 展开成几个 G，要么丢掉联接让 DSH 的插件加载失败。
+Windows 下从旧版本迁过来？跑 `sync-data.ps1`：它把 DSH 的对话与运行时搬过来，并重建
+几百个目录联接——直接复制要么顺着联接把 690 MB 展开成几个 G，要么丢掉联接让 DSH 的
+插件加载失败。全新安装用不到它。
 
 ### `plugins.json`
 
@@ -133,6 +164,15 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
 宿主接受两种请求：`Host` 等于上面的 origin，或是本机端口上的回环名。其余一律 `400`，
 外来 `Origin` 头拿 `403`。这就是「手机能用，但同一个浏览器里随便一个网页用不了」的实现方式。
 
+## 已知限制
+
+- **一个人、一台机器。** 没有账号体系、没有用户隔离。不要直接暴露到公网，反向代理才是
+  安全边界。
+- **外壳界面只有简体中文。** README 双语，UI 不是。
+- **还没到 1.0。** 插件与宿主之间的接口、HTTP 路由都可能在小版本里变。
+- **自带的 Zotero reader 是构建产物**（`web/zotero-reader/`，约 10 MB）。来源与构建方法见
+  [NOTICE.md](NOTICE.md)。
+
 ## 加一个插件
 
 新建 `plugins/mytool/`，两个文件。
@@ -164,6 +204,7 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
 |---|---|
 | `handle(request) -> bool` | 处理你声明的路径；返回 `False` 表示继续往下找 |
 | `available() -> bool` | 卡片是否可用的轻量探测，**不允许**在里面启动任何东西 |
+| `reason() -> str` | 可选：一行说明 `available()` 为什么是 `False`，显示在置灰的卡片上 |
 | `start()` / `stop()` | 生命周期，随宿主一起 |
 | `status() -> dict` | 可选，给你自己的调试端点用 |
 
@@ -187,8 +228,11 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
 ## 开发
 
 ```bash
-python -m pytest          # 35 个测试：安全闸门、路由、缓存策略、插件、端到端起服务
+python -m pytest          # 40 个测试：安全闸门、路由、缓存策略、插件、端到端起服务
 ```
+
+每次 push 都会在 Windows 和 Linux 上跑同一套测试
+（[workflow](.github/workflows/tests.yml)）。
 
 目录：
 
@@ -197,6 +241,7 @@ workbench/    宿主：config、errors、插件注册表、request 外观、serv
 plugins/      一个插件一个包，各自带 plugin.json
 web/          外壳、插件页面，以及自带的 Zotero reader
 web/zotero-reader/   官方 Zotero reader 的构建产物（见 NOTICE.md）
+docs/         上面那张截图
 tests/
 ```
 

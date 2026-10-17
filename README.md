@@ -2,16 +2,20 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
+[![tests](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml)
+
 A small, self-hosted workbench for reaching your own computer from anywhere: a
 plugin host with one page per tool, designed for a private network (Tailscale)
 and a slow, high-latency link.
+
+![The workbench shell: three plugins, all ready](docs/screenshot.png)
 
 Three plugins ship with it:
 
 | Plugin | What it does | Needs on your machine |
 |---|---|---|
-| `agents` | The full DSH chat workspace, with Codex and Claude Code available as agents | `node` + a DeepSeek API key |
-| `zotero` | Browse your Zotero library, read PDFs, translate a selection | the Zotero desktop app |
+| `agents` | The full DSH chat workspace, with Codex and Claude Code available as agents | `node` 18+, the DSH runtime (one `npm install`, see below) and a DeepSeek API key |
+| `zotero` | Browse your Zotero library, read PDFs, translate a selection | the Zotero desktop app; selection translation additionally needs the *Translate for Zotero* plugin configured with a custom GPT / ChatGPT service |
 | `vscode` | Edit code in VS Code Web, inside the shell (top-bar links stay available) | the VS Code CLI (`code`) |
 
 A fourth plugin is a folder with two files. The host never imports a plugin by
@@ -24,11 +28,11 @@ host.
 
 ```
 browser ──HTTPS──▶ private reverse proxy ──▶ 127.0.0.1:8768  (host)
-                                                    │
-                          ┌─────────────────────────┼─────────────────────┐
-                     static web/            /api/<plugin>          /<plugin>/
-                          │                         │                     │
-                    the shell + pages      plugin Python module     302 or link
+                                                     │
+                           ┌─────────────────────────┼─────────────────────┐
+                      static web/            /api/<plugin>          /<plugin>/
+                           │                         │                     │
+                     the shell + pages      plugin Python module     302 or link
 ```
 
 - **One inbound surface.** The host binds `127.0.0.1` only. Remote access is a
@@ -48,13 +52,19 @@ browser ──HTTPS──▶ private reverse proxy ──▶ 127.0.0.1:8768  (ho
 ## Requirements
 
 - Python 3.10+ (the host and all bundled plugins use the standard library only)
-- Optional, per plugin: `node` and the DSH runtime (agents), the Zotero desktop
-  app (zotero), the VS Code CLI (vscode)
+- Optional, per plugin: `node` 18+ and the DSH runtime (agents), the Zotero
+  desktop app (zotero), the VS Code CLI (vscode)
+
+The host is plain Python and its test suite runs on both Windows and Linux in CI,
+but day-to-day use is Windows: the launcher and remote-access helpers are
+PowerShell scripts, and the `zotero` / `vscode` plugins look for Windows install
+locations. On Linux or macOS the host and the shell work; those two plugins will
+report why they are unavailable.
 
 ## Run it
 
 ```bash
-git clone <this repo> AgentWorkbench
+git clone https://github.com/Zhang-Zhi-b-o/AgentWorkbench.git
 cd AgentWorkbench
 python -m workbench
 ```
@@ -71,11 +81,36 @@ AgentWorkbench listening on http://127.0.0.1:8768
   zotero    iframe   /plugins/zotero/   ready
 ```
 
-Nothing else is required: a plugin whose dependency is missing simply reports
-`not available` and its card is disabled, while the rest keep working.
+A plugin whose dependency is missing is reported as `not available`; its card
+stays disabled and says what is missing, and the rest keep working.
 
 On Windows, `start.ps1` does the same thing from a shortcut: it reuses a healthy
 running instance, starts one in the background if needed, then opens the browser.
+
+### Install the DSH runtime (the `agents` plugin)
+
+`agents` drives a local DSH install; it does not bundle one. Install it once into
+the data directory, from the checkout root:
+
+```bash
+# Windows PowerShell
+New-Item -ItemType Directory -Force data | Out-Null
+npm install --prefix "$PWD\data\dsh-runtime" @deepseek-ai/dsh
+```
+
+```bash
+# macOS / Linux
+mkdir -p data
+npm install --prefix "$PWD/data/dsh-runtime" @deepseek-ai/dsh
+```
+
+Creating `data/` first also pins `WORKBENCH_HOME` to this checkout (see below), so
+the runtime lands exactly where the plugin looks for it. If you keep your data
+somewhere else, install into `$WORKBENCH_HOME/dsh-runtime` instead.
+
+The plugin then needs a DeepSeek API key; see [The DeepSeek key](#the-deepseek-key).
+If either piece is missing, the disabled card and the `503` from `/agents/` both
+print the exact command for your machine — you do not have to guess the path.
 
 ## Configuration
 
@@ -94,9 +129,10 @@ the platform data directory (`%LOCALAPPDATA%\AgentWorkbench`,
 
 Override the listen port with `WORKBENCH_PORT`.
 
-Moving an existing installation? `sync-data.ps1` brings the DSH conversations and
-runtime across, including the ~500 directory junctions that a plain copy would
-either follow (and explode) or drop (and break the plugin loader).
+Moving an existing installation on Windows? `sync-data.ps1` brings the DSH
+conversations and runtime across, including the ~500 directory junctions that a
+plain copy would either follow (and explode) or drop (and break the plugin
+loader). A fresh install never needs it.
 
 ### `plugins.json`
 
@@ -149,6 +185,17 @@ its own port. Anything else is rejected with `400`, and a foreign `Origin` heade
 gets `403`. That is what lets the page work from a phone while remaining
 unreachable to a random web page on the same machine.
 
+## Known limits
+
+- **One person, one machine.** No accounts, no per-user isolation. Do not expose
+  the host to the open internet; the reverse proxy is the security boundary.
+- **The shell's interface is Simplified Chinese only.** The README is bilingual;
+  the UI is not.
+- **Pre-1.0.** Interfaces between plugins and the host, and the HTTP routes, may
+  change in minor releases.
+- **The bundled Zotero reader is a build artifact** (`web/zotero-reader/`,
+  ~10 MB). See [NOTICE.md](NOTICE.md) for its provenance and build steps.
+
 ## Adding a plugin
 
 Create `plugins/mytool/` with two files.
@@ -180,6 +227,7 @@ Create `plugins/mytool/` with two files.
 |---|---|
 | `handle(request) -> bool` | serve a path you declared in `routes`; return `False` to fall through |
 | `available() -> bool` | cheap probe used for the card's enabled state; must not start anything |
+| `reason() -> str` | optional: one line explaining why `available()` is `False`, shown on the disabled card |
 | `start()` / `stop()` | lifecycle, called with the host |
 | `status() -> dict` | optional operational facts for your own debug endpoint |
 
@@ -205,8 +253,11 @@ and the host formats it for the browser.
 ## Development
 
 ```bash
-python -m pytest          # 35 tests: guards, routing, cache policy, plugins, end to end
+python -m pytest          # 40 tests: guards, routing, cache policy, plugins, end to end
 ```
+
+CI runs the same suite on Windows and Linux for every push
+([workflow](.github/workflows/tests.yml)).
 
 Layout:
 
@@ -215,6 +266,7 @@ workbench/     host: config, errors, plugin registry, request facade, server
 plugins/       one package per plugin, each with plugin.json
 web/           shell, plugin pages, and the bundled Zotero reader
 web/zotero-reader/   official Zotero reader build (see NOTICE.md)
+docs/          screenshot used above
 tests/
 ```
 
