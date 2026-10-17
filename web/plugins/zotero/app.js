@@ -5,6 +5,7 @@
   const PAGE = 25, LIMIT = 6000, READER = '/zotero-reader/reader.html';
   const L = $('libraryView'), DV = $('detailView'), RV = $('readerView'), BB = $('backBtn');
   const CL = $('collectionList'), CE = $('collectionError'), CET = $('collectionErrorText'), RC = $('retryCollections');
+  const RAIL = $('rail'), RAIL_HEAD = $('railHead'), RAIL_CURRENT = $('collectionCurrent');
   const SI = $('searchInput');
   const LE = $('listError'), LET = $('listErrorText'), RL = $('retryList'), LK = $('listSkeleton');
   const IL = $('itemList'), ES = $('emptyState'), ET = $('emptyTitle'), EX = $('emptyText');
@@ -84,23 +85,100 @@
     return data;
   }
 
-  /* 分类与条目列表 */
+  /* 目录与条目列表
+     Zotero 的分类本来就是多级目录（这台机器上近 60 个、最深 5 级），铺成一排
+     按钮一次全摊开，找起来比翻目录还累。这里按目录来：根是「全部条目」，点
+     三角展开下一级，点名字选中这一级；默认只画顶层，所以一屏就那么几行。 */
+  const NARROW = () => matchMedia('(max-width:720px)').matches;
+  let expanded = new Set(['']), railOpen = false, railTouched = false;
+
+  // 树本身不缓存：59 个目录重建一次比维护一份增量结构省心，也省得父节点变了
+  // 还要修补。
+  function buildTree() {
+    const root = { key: '', name: '全部条目', parent: '', children: [] };
+    const nodes = new Map();
+    colls.forEach((item) => nodes.set(item.key, {
+      key: item.key, name: str(item.name) || item.key,
+      parent: str(item.parent) || '', children: []
+    }));
+    colls.forEach((item) => {
+      const node = nodes.get(item.key);
+      const parent = node.parent ? nodes.get(node.parent) : null;
+      if (parent) parent.children.push(node);
+      else root.children.push(node);
+    });
+    return root;
+  }
+  function ancestorsOf(target) {
+    const out = [];
+    let node = colls.find((item) => item.key === target);
+    while (node && str(node.parent)) {
+      out.push(node.parent);
+      node = colls.find((item) => item.key === node.parent);
+    }
+    return out;
+  }
+  function pathOf(target) {
+    const names = [];
+    let node = colls.find((item) => item.key === target);
+    while (node) {
+      names.unshift(str(node.name) || node.key);
+      const parent = str(node.parent);
+      node = parent ? colls.find((item) => item.key === parent) : null;
+    }
+    return names.length ? names.join(' / ') : '全部条目';
+  }
+  function railRow(node, depth) {
+    const row = mk('div', 'rail-row');
+    row.style.setProperty('--depth', String(depth));
+    const open = expanded.has(node.key);
+    if (node.children.length) {
+      const caret = mk('button', 'rail-caret', open ? '▾' : '▸');
+      caret.type = 'button';
+      caret.dataset.act = 'toggle';
+      caret.dataset.k = node.key;
+      caret.setAttribute('aria-expanded', String(open));
+      caret.setAttribute('aria-label', (open ? '收起 ' : '展开 ') + node.name);
+      row.append(caret);
+    } else {
+      const spacer = mk('span', 'rail-caret rail-caret-empty');
+      spacer.setAttribute('aria-hidden', 'true');
+      row.append(spacer);
+    }
+    const name = mk('button', 'rail-name', node.name);
+    name.type = 'button';
+    name.dataset.act = 'pick';
+    name.dataset.k = node.key;
+    name.title = node.name;
+    if (node.key === coll) name.setAttribute('aria-current', 'true');
+    row.append(name);
+    return row;
+  }
+  function railBranch(node, depth, frag) {
+    frag.append(railRow(node, depth));
+    if (!expanded.has(node.key)) return;
+    node.children.forEach((child) => railBranch(child, depth + 1, frag));
+  }
   function drawCollections() {
     const frag = document.createDocumentFragment();
-    const all = mk('button', 'button', '全部条目');
-    all.type = 'button';
-    all.dataset.k = '';
-    all.setAttribute('aria-pressed', String(coll === ''));
-    frag.append(all);
-    colls.forEach((item) => {
-      const button = mk('button', 'button', str(item.name) || item.key);
-      button.type = 'button';
-      button.dataset.k = item.key;
-      button.title = str(item.name) || item.key;
-      button.setAttribute('aria-pressed', String(coll === item.key));
-      frag.append(button);
-    });
+    railBranch(buildTree(), 0, frag);
     CL.replaceChildren(frag);
+    const path = pathOf(coll);
+    RAIL_CURRENT.textContent = path;
+    RAIL_HEAD.title = '当前目录：' + path;
+  }
+  // 收起时整块目录只剩一行「当前目录」，条目列表紧跟在下面。
+  function setRailOpen(open) {
+    railOpen = open;
+    RAIL.classList.toggle('is-closed', !open);
+    RAIL_HEAD.setAttribute('aria-expanded', String(open));
+  }
+  // 默认开合看宽度：宽屏常驻，窄屏先收起。插件常常是在隐藏的 iframe 里开始
+  // 载入的（宽度 0），那一刻量出来的结论不可信，所以等它有宽度、以及视口跨过
+  // 断点时再定；用户自己点过之后就听用户的。
+  function syncRailDefault() {
+    if (railTouched || !RAIL.clientWidth) return;
+    setRailOpen(!NARROW());
   }
   async function loadCollections() {
     if (cabort) cabort.abort();
@@ -488,18 +566,40 @@
 
   /* 事件 */
   CL.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-k]');
+    const button = event.target.closest('button[data-act]');
     if (!button) return;
     const value = button.dataset.k || '';
-    if (value === coll) return;
+    if (button.dataset.act === 'toggle') {
+      if (expanded.has(value)) expanded.delete(value); else expanded.add(value);
+      drawCollections();
+      return;
+    }
+    if (value === coll) {
+      if (NARROW()) setRailOpen(false);
+      return;
+    }
     coll = value;
     q = SI.value.trim();
-    CL.querySelectorAll('button[data-k]').forEach((item) => {
-      item.setAttribute('aria-pressed', String((item.dataset.k || '') === coll));
-    });
+    expanded.add('');
+    ancestorsOf(coll).forEach((k) => expanded.add(k));
+    drawCollections();
+    // 手机上选完目录就把目录收起来，条目列表立刻占满屏幕。
+    if (NARROW()) {
+      railTouched = true;
+      setRailOpen(false);
+    }
     clearTimeout(searchTimer);
     loadItems(true);
   });
+  RAIL_HEAD.addEventListener('click', () => {
+    railTouched = true;
+    setRailOpen(!railOpen);
+  });
+  window.addEventListener('resize', syncRailDefault);
+  // iframe 从 display:none 变可见时不一定有 resize 事件，直接盯着根元素尺寸。
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => syncRailDefault()).observe(document.documentElement);
+  }
   SI.addEventListener('input', () => {
     q = SI.value.trim();
     clearTimeout(searchTimer);
@@ -550,6 +650,8 @@
 
   DT.setAttribute('tabindex', '-1');
   setView('library');
+  // 宽屏目录常驻在左边，窄屏先收起成一行「当前目录」（见 syncRailDefault）。
+  syncRailDefault();
   loadCollections();
   loadItems(true);
 })();

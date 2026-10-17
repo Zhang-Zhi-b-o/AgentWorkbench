@@ -99,7 +99,11 @@
   });
   applyCollapsed();
 
-  // 立刻开工：当前地址就是插件的入口。
+  // 立刻开工：当前地址就是插件的入口。内容区要先露出来再设 src —— 插件可能
+  // 在载入时就量自己的视口（比如 Zotero 按宽度决定目录开合），藏在一个
+  // display:none 的框里会量到 0 宽度，于是一上来就用错布局。
+  views.hidden = false;
+  errorBox.hidden = true;
   frame.src = location.pathname + location.search;
   document.title = '工作台';
 

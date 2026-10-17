@@ -5,8 +5,28 @@
 .button.back{min-height:40px;padding:0 9px;font-size:12px;white-space:nowrap;background:none}.button.small{min-height:40px;padding:0 11px;white-space:nowrap}.button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.button.primary:hover{color:var(--on-accent)}
 .zp-main{display:flex;flex:1;min-height:0}.view{flex:1;min-width:0;min-height:0}.library,.detail{overflow-y:auto;-webkit-overflow-scrolling:touch}
 .lib{display:flex;flex-wrap:wrap;gap:12px;width:100%;max-width:1200px;margin:auto;padding:13px max(12px,env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
-.rail{flex:1 1 190px;max-width:235px;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.rail-list{display:flex;flex-wrap:wrap;gap:5px}.rail-list .button{flex:1 1 auto;min-height:40px;padding:0 11px;border-radius:8px;background:none;font-size:12.5px}.rail-list .button[aria-pressed="true"]{border-color:transparent;background:var(--soft);color:var(--accent);font-weight:650}
-.rail-skeleton{display:block;flex:1 1 80px;height:40px;border-radius:8px;background:var(--soft)}.rail-error{padding:6px 1px 0;color:var(--danger);font-size:12px}.rail-error p{margin:0;overflow-wrap:anywhere}.text-button{display:inline-flex;align-items:center;min-height:40px;padding:0 3px;border:0;background:none;color:var(--accent);font-size:12.5px;font-weight:650;cursor:pointer}.items{flex:999 1 320px;min-width:0}
+.rail{display:flex;flex-direction:column;flex:0 0 208px;align-self:flex-start;max-width:250px;max-height:min(70vh,560px);min-height:0;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+/* 目录：顶部一行是「当前目录」，点它收起/展开下面这棵树。收起后整块只剩这一行，
+   所以手机上目录不会再把条目列表顶出屏幕。 */
+.rail-head{display:flex;align-items:center;gap:7px;flex:none;width:100%;min-height:36px;padding:0 8px;border:1px solid var(--line);border-radius:9px;background:var(--soft);color:var(--text);font-size:12.5px;font-weight:650;text-align:left;cursor:pointer}
+.rail-head:hover{background:var(--soft-2)}
+.rail-head:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rail-head svg{flex:none;width:15px;height:15px;fill:none;stroke:var(--muted);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rail-head-label{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rail-head-caret{flex:none;color:var(--muted);font-size:11px;line-height:1;transition:transform .14s}
+.rail.is-closed .rail-head-caret{transform:rotate(-90deg)}
+.rail.is-closed .rail-list,.rail.is-closed .rail-error{display:none}
+/* 树：每级缩进 11px。三角只管展开，名字负责选中，所以「进一层」和「选这层」
+   是两个不同的点击目标。 */
+.rail-list{display:flex;flex-direction:column;gap:1px;flex:1;min-height:0;margin-top:6px;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;overscroll-behavior:contain}
+.rail-row{display:flex;align-items:center;padding-left:calc(var(--depth,0) * 11px);border-radius:8px}
+.rail-caret{display:grid;place-items:center;flex:none;width:20px;height:32px;padding:0;border:0;border-radius:6px;background:none;color:var(--muted);font-size:9px;line-height:1;cursor:pointer}
+.rail-caret:hover{background:var(--soft-2);color:var(--text)}
+.rail-caret-empty{cursor:default;pointer-events:none}
+.rail-name{flex:1;min-width:0;min-height:32px;padding:0 7px 0 3px;border:0;border-radius:7px;background:none;color:var(--text);font-size:12.5px;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rail-name:hover{color:var(--accent)}
+.rail-name[aria-current="true"]{background:var(--soft);color:var(--accent);font-weight:650}
+.rail-skeleton{display:block;height:32px;border-radius:8px;background:var(--soft)}.rail-error{padding:6px 1px 0;color:var(--danger);font-size:12px}.rail-error p{margin:0;overflow-wrap:anywhere}.text-button{display:inline-flex;align-items:center;min-height:40px;padding:0 3px;border:0;background:none;color:var(--accent);font-size:12.5px;font-weight:650;cursor:pointer}.items{flex:999 1 320px;min-width:0}
 .search{position:relative;display:flex;align-items:center;height:46px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.search:focus-within{border-color:var(--accent)}.search svg{position:absolute;left:13px;width:18px;height:18px;fill:none;stroke:var(--muted);stroke-width:1.7;stroke-linecap:round}.search input{width:100%;height:100%;padding:0 14px 0 39px;border:0;outline:0;background:none;font-size:16px;-webkit-appearance:none}.search input::placeholder{color:var(--muted)}.search input::-webkit-search-cancel-button{-webkit-appearance:none}
 
 .alert{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid var(--danger);border-radius:10px;background:var(--danger-soft);color:var(--danger)}.alert b{font-size:12px}.alert p{margin:2px 0 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}.skeleton{min-height:350px;border-top:1px solid var(--line);background:linear-gradient(180deg,var(--panel) 70%,var(--soft))}
@@ -33,13 +53,14 @@
 .sel-src{color:var(--faint);font-size:11.5px}
 .sel-foot .text-button{margin-left:auto}
 
-/* 手机上 60 个分类按钮会把条目列表顶到屏幕外：分类压成一条可横滑的窄带，
-   条目列表紧跟在下面。 */
+/* 手机上目录默认收成一行「当前目录」：选完目录它会自动收起，条目列表立刻占满
+   屏幕；展开时这棵树自己滚动，最多占 46vh，不会把列表顶下去。 */
 @media(max-width:720px){
   .lib{flex-direction:column;flex-wrap:nowrap;gap:8px;padding-top:8px}
-  .rail{flex:none;width:100%;max-width:none;padding:6px}
-  .rail-list{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:5px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  .rail-list::-webkit-scrollbar{display:none}
-  .rail-list>*{flex:none;width:auto;white-space:nowrap}
+  .rail{flex:none;width:100%;max-width:none;max-height:none;padding:6px}
+  .rail-head{min-height:40px;padding:0 10px;font-size:13px}
+  .rail-list{max-height:46vh;gap:0}
+  .rail-caret{width:26px;height:38px;font-size:10px}
+  .rail-name{min-height:38px;font-size:13.5px}
   .items{flex:1 1 auto;width:100%}
 }
