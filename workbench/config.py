@@ -34,6 +34,9 @@ LEGACY_SHARED_HEADERS = ("X-Agent-Hub",)
 
 # Upper bound for a JSON request body (attachments are not handled by the host).
 JSON_BODY_LIMIT = 8_000_000
+# Upper bound for a raw, non-JSON request body (a plugin's own upload stream).
+# Sized for "one file copied from a phone", streamed to disk rather than buffered.
+RAW_BODY_LIMIT = int(os.environ.get("WORKBENCH_RAW_LIMIT", str(2 * 1024 ** 3)))
 
 _MISSING = object()
 

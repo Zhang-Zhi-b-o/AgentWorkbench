@@ -422,8 +422,9 @@
       const data = await read(await request('/api/zotero/translate', {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Workbench': '1' },
-        // 中文选区译成英文，其余译成中文。
-        body: JSON.stringify({ text: value.slice(0, 12000),
+        // 中文选区译成英文，其余译成中文。itemKey 让服务端跟 Zotero 桌面插件
+        // 用同一条缓存记录（缓存指纹里有论文标题/摘要）。
+        body: JSON.stringify({ text: value.slice(0, 12000), itemKey: key,
           target: /[\u4e00-\u9fff]/.test(value) ? 'en' : 'zh', extraPrompt: '' }),
         signal: controller.signal
       }, 90000));

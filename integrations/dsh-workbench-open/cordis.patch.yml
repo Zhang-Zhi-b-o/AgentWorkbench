@@ -1,0 +1,13 @@
+# dsh-workbench-open bundle patch.
+#
+# Mounts the browser entry and retires the built-in local "Open In..." action:
+# that menu launches desktop applications on the host, which a phone or a
+# remote browser cannot use.  The workbench's own file browser and VS Code open
+# in a new tab instead.  `name` must equal package.json's "name".
+- insert:
+    - id: workbench-open
+      name: 'dsh-workbench-open'
+- id: open-in-app
+  disabled: true
+- id: ui-open-in-app
+  disabled: true

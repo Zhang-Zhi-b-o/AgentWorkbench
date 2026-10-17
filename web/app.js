@@ -26,6 +26,8 @@
       bot: 'M12 8V5m-6 5h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Zm3 5h.01M15 13h.01',
       book: 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5V5.5Zm0 0V20a1 1 0 0 0 1 1h15M8 7h8M8 11h6',
       code: 'm8 8-4 4 4 4m8-8 4 4-4 4M13.5 5l-3 14',
+      folder: 'M3 7.2A1.6 1.6 0 0 1 4.6 5.6h3.8l1.5 2.1H19a1.4 1.4 0 0 1 1.4 1.4v8.4A1.4 1.4 0 0 1 19 19H4.6A1.6 1.6 0 0 1 3 17.4V7.2Z',
+      doc: 'M6 3h8l4 4v14H6V3Zm8 0v4h4M9 12h6M9 16h5',
       grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z'
     };
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

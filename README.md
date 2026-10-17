@@ -8,7 +8,7 @@ and a slow, high-latency link.
 
 ![The workbench shell: every plugin ready](docs/screenshot.png)
 
-In one sentence: **AI chat, file management, Office editing, Zotero reading and
+In one sentence: **AI chat, file management, Office preview, Zotero reading and
 VS Code, all behind one web page.** Open the same address from a phone, a tablet
 or another computer; no remote desktop and no extra port per tool.
 
@@ -17,10 +17,13 @@ or another computer; no remote desktop and no extra port per tool.
 | Plugin | What it does | Needs on your machine |
 |---|---|---|
 | `agents` | The full DSH chat workspace, with Codex and Claude Code available as agents | `node` 18+, the DSH runtime (one `npm install`, see below) and a DeepSeek API key |
-| `explorer` | Browse the whole computer: preview and edit text, upload and download, copy and move, zip and unzip, and open any folder in VS Code or the Office editor | nothing |
-| `office` | Edit Word, Excel and PPT in the browser, rendered by a local ONLYOFFICE document server, saved straight back to the original file | ONLYOFFICE Docs installed locally (Windows installer or Docker) |
+| `explorer` | Browse the whole computer: preview Office documents, edit text, upload and download, copy and move, zip and unzip, and open any folder in VS Code | nothing |
 | `zotero` | Browse your Zotero library, read PDFs, translate a selection | the Zotero desktop app; selection translation additionally needs the *Translate for Zotero* plugin configured with a custom GPT / ChatGPT service |
 | `vscode` | Edit code in VS Code Web, inside the shell (top-bar links stay available) | the VS Code CLI (`code`) |
+
+A fifth plugin, `office` (browser editing through a local ONLYOFFICE Docs server),
+ships parked with `"hidden": true`: its mobile web editor is view-only in the free
+edition. See [Office documents](#office-documents-preview-and-hand-off).
 
 One more plugin is just a folder with two files. The host never imports a plugin
 by name and never inspects its internals, so adding a tool does not mean editing
@@ -69,29 +72,34 @@ A file manager in the browser, covering the whole computer.
 - **Zip and unzip.** Pack files or folders into a zip download, or extract a zip
   into a target directory.
 - **Open elsewhere.** From the context menu, hand a file or folder to the built-in
-  VS Code (`/vscode/?folder=…`), the Office editor (`/plugins/office/?path=…`), or
-  the desktop's default application on Windows.
+  VS Code (`/vscode/?folder=/d:/…`), or open it with the desktop's default
+  application on Windows. Office documents preview in place and download as the
+  original file (see [Office documents](#office-documents-preview-and-hand-off)).
 - **Path guard.** Every path is normalized and checked for escapes; `..` cannot
   climb out of the allowed roots.
 
-### Office editor (`office`)
+### Office documents: preview and hand off
 
-The workbench does not implement Office itself. Documents are rendered by a local
-**ONLYOFFICE Docs** server, so what you see in the browser is ONLYOFFICE's editor.
+The workbench does not edit Office files in the browser. Clicking one in `explorer`
+shows a **full-page preview** — the document is rendered to a read-only PDF by the
+Microsoft Office installed on the same machine — and the button in the preview's
+top-right corner **downloads the original file**, unchanged, for the editor on the
+device you are holding (Word/Pages on a tablet, Word on a desktop, WPS anywhere).
 
-- **Formats.** Word (.docx), Excel (.xlsx) and PowerPoint (.pptx); other
-  extensions are rejected.
-- **Save in place.** The document server calls back on save and the workbench
-  writes the change to the original file — no download-and-upload round trip.
-- **New documents.** Create a Word, Excel or PPT file right from the page, using
-  the same endpoint as the file manager, so both produce the same kind of file.
-- **Opened from Files.** Right-click any Office document in `explorer` and pick
-  the Office editor.
-- **Verified callbacks.** Saves use a one-time file ticket plus a JWT; when
-  `ONLYOFFICE_JWT_SECRET` is configured the signature is verified, otherwise the
-  page warns instead of blocking.
-- **When the server is missing.** The page says so and prints the installer URL
-  and Docker image name.
+- **Formats.** Word, Excel and PowerPoint (`.docx/.xlsx/.pptx`, plus the older
+  `.doc/.xls/.ppt` and the OpenDocument equivalents).
+- **Faithful preview, read-only.** Office exports the file to PDF;
+  `data/preview-cache/` keeps the result keyed on path, size and mtime, so the
+  second look is instant. A PDF cannot be edited in place, which is the point.
+- **Download is the source file.** The preview PDF is never what you get — the
+  button serves the original bytes with its original name.
+- **Why not edit in the browser.** ONLYOFFICE Docs can do it for the desktop web
+  editor, but its *mobile* web editor is view-only in the free Community edition,
+  so on a tablet the editor loads and then ignores every keystroke. The `office`
+  plugin is therefore parked (`"hidden": true` in its manifest); set that back to
+  `false` to bring the editor tab and its `/office` proxy back.
+- **Editing round trip.** Edit on the device with its own Office, then upload the
+  file back through `explorer` (a browser cannot write to the host on its own).
 
 ### Zotero reading (`zotero`)
 
@@ -122,9 +130,15 @@ redirected**.
   all pass through the host; editing, terminal, extensions and the Git panel
   keep working.
 - **Opened from Files.** Click “VS Code” in `explorer` to open the current folder
-  as `/vscode/?folder=<path>`.
+  as `/vscode/?folder=/d:/…`: the web workbench builds
+  `vscode-remote://<authority><path>` only for a value that starts with `/`, so a
+  bare `D:\…` keeps URI scheme `d` and drops the drive letter, and a `file://`
+  URI names a scheme the remote server does not serve — both leave the explorer
+  empty.
 - **Direct link.** `/vscode/` also works on its own, with the workbench plugin
-  bar kept on top.
+  bar kept on top. The bare URL redirects to the plugin's `folder` setting
+  (`plugins.json`), because stock serve-web answers it with the empty welcome
+  window, i.e. nothing to edit.
 
 ---
 
@@ -144,10 +158,9 @@ lives and what it found for each plugin:
 ```
 AgentWorkbench listening on http://127.0.0.1:8768
   data      /path/to/AgentWorkbench/data
-  plugins   5 from /path/to/AgentWorkbench/plugins
+  plugins   4 from /path/to/AgentWorkbench/plugins
   agents    iframe   /agents/           ready
   explorer  iframe   /plugins/explorer/ ready
-  office    iframe   /plugins/office/   ready
   vscode    link     /vscode/           ready
   zotero    iframe   /plugins/zotero/   ready
 ```
@@ -163,8 +176,7 @@ running instance, starts one in the background if needed, then opens the browser
 - The home page shows one card per plugin; the top bar switches between plugins
   directly.
 - Every plugin has its own address, so it can be bookmarked or opened in a new
-  tab: `/plugins/explorer/`, `/plugins/office/`, `/plugins/zotero/`, `/vscode/`,
-  `/agents/`.
+  tab: `/plugins/explorer/`, `/plugins/zotero/`, `/vscode/`, `/agents/`.
 - Opening a plugin address directly wraps it in the workbench bar; opening it
   inside the shell does not nest a second one.
 - The top bar collapses to a thin handle, giving the content the full height
@@ -183,7 +195,7 @@ running instance, starts one in the background if needed, then opens the browser
 1. Open the “文件” tab and pick a quick-access folder or a drive.
 2. Click into folders; move around with `←`, `→`, `↑` and the breadcrumbs.
 3. Select a file to download, rename, copy, move or delete. The context menu also
-   offers “open in VS Code”, “edit in Office” and “open locally”.
+   offers “open in VS Code” and “open locally”.
 4. “＋ 新建”, “上传” and “粘贴” act on the current folder; the search box searches
    only that folder.
 5. Compress: select entries and download a zip. Extract: choose a zip and a
@@ -191,14 +203,14 @@ running instance, starts one in the background if needed, then opens the browser
 
 ### Editing Office documents
 
-1. Make sure ONLYOFFICE Docs is installed and running (Windows installer or
-   Docker both work).
-2. In “文件”, right-click a `.docx` / `.xlsx` / `.pptx` and choose the Office
-   editor; or create a new document from the “Office 编辑器” tab.
-3. Edit and save; changes go back to the original file. The page also offers
-   “reload”, “download” and “show in files”.
-4. If the page reports no document server, install it as prompted. Keep the JWT
-   secret in sync with ONLYOFFICE's `local.json`.
+1. Click the `.docx` / `.xlsx` / `.pptx` in “文件”. The workbench renders a
+   read-only preview and offers “下载并打开” in the preview's top-right corner.
+2. That button downloads the original file; open it with the editor on the device
+   you are using (Word or Pages on a tablet, Word on a desktop).
+3. When you are finished, upload the file back through “文件”. A browser cannot
+   write to the host's disk on its own, so this step stays manual.
+4. If the preview reports that it could not be rendered, Microsoft Office is
+   missing or busy on the host; the download still works.
 
 ### Reading Zotero items
 
@@ -258,8 +270,9 @@ browser ──HTTPS──▶ private reverse proxy ──▶ 127.0.0.1:8768  (ho
 ## Requirements
 
 - Python 3.10+ (the host and all bundled plugins use the standard library only)
-- Optional, per plugin: `node` 18+ and the DSH runtime (agents), ONLYOFFICE Docs
-  (office), the Zotero desktop app (zotero), the VS Code CLI (vscode)
+- Optional, per plugin: `node` 18+ and the DSH runtime (agents), the Zotero desktop
+  app (zotero), the VS Code CLI (vscode). Office previews additionally use the
+  Microsoft Office already installed on a Windows host, when there is one.
 - `explorer` needs nothing extra
 
 The host is plain Python and its test suite runs on both Windows and Linux in CI,
@@ -306,12 +319,14 @@ The plugin then needs a DeepSeek API key; see [The DeepSeek key](#the-deepseek-k
 If either piece is missing, the disabled card and the `503` from `/agents/` both
 print the exact command for your machine — you do not have to guess the path.
 
-### Install the Office document server (the `office` plugin)
+### Office preview (optional)
 
-Install the Windows build from the
+Previews are produced by the Microsoft Office installed on the host, so there is
+nothing to install while Office is present. If only the parked `office` plugin is
+wanted back, install the Windows build from the
 [ONLYOFFICE Docs download page](https://download.onlyoffice.com/install/documentserver/windows/onlyoffice-documentserver.exe)
-or run the Docker image `onlyoffice/documentserver`. The workbench detects it
-automatically. To verify save callbacks, put the document server's JWT secret in
+or run the Docker image `onlyoffice/documentserver`, then set `"hidden": false` in
+`plugins/office/plugin.json`; put the document server's JWT secret in
 `ONLYOFFICE_JWT_SECRET`.
 
 ## Configuration
@@ -402,8 +417,8 @@ unreachable to a random web page on the same machine.
   on cross-origin iframes, service workers and the hostname check leave the panel
   blank or unable to load. Editing, the terminal and file operations are
   unaffected; use the workbench's own “AI 对话” plugin for AI chat instead.
-- **Office depends on a local document server.** Without ONLYOFFICE Docs the
-  `office` page explains what to install; the other plugins are unaffected.
+- **Office previews need Office on the host.** Only the PDF preview uses it; the
+  download button and every other plugin keep working without it.
 
 ## Adding a plugin
 

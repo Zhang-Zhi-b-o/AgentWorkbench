@@ -31,6 +31,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from workbench import config
+from workbench.folders import remote_query
 from workbench.processes import ProcessTree
 
 PREFIX = "/vscode"
@@ -176,6 +177,24 @@ def stop() -> None:
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
+
+
+def start_query() -> str:
+    """``?folder=`` for the bare editor tab, so it opens a workspace, not nothing.
+
+    The workbench bar links to ``/vscode/`` with no folder, which stock serve-web
+    answers with the welcome window: an empty explorer and no file to edit.  The
+    plugin's configured ``folder`` setting is the start folder, and it is spelled
+    the remote way -- a file URI here would be just as empty (see
+    ``workbench.folders``).
+    """
+    text = DEFAULT_FOLDER.strip()
+    if not text:
+        return ""
+    folder = Path(text).expanduser()
+    if not folder.is_dir():
+        return ""
+    return "folder=" + remote_query(folder)
 
 
 _COMPRESSIBLE = ("text/", "application/javascript", "application/json",
@@ -424,13 +443,21 @@ def handle(request) -> bool:
         request.json(200, status())
         return True
     if request.method == "POST" and path == "/api/vscode/start":
-        request.json(200, start())
+        start()
+        # ``start()`` carries the live process handle, which is not JSON.
+        request.json(200, status())
         return True
     if request.method == "POST" and path == "/api/vscode/stop":
         stop()
         request.json(200, status())
         return True
     if path == PREFIX or path.startswith((PREFIX + "/", WEBVIEW_PREFIX + "/")):
+        if (request.method == "GET" and path.rstrip("/") == PREFIX
+                and "folder=" not in (request.raw_query or "")):
+            query = start_query()
+            if query:
+                request.redirect("%s/?%s" % (PREFIX, query))
+                return True
         proxy(request.raw, path, request.raw_query)
         return True
     return False

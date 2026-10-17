@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- Office 插件页：把 ONLYOFFICE 编辑器铺满整页。
+     ?path=<文件> 打开现有文档；?new=word|xlsx|ppt&dir=<目录> 先新建再打开。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151517" media="(prefers-color-scheme: dark)">
+<title>Office · 工作台</title>
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../app.css?v=10">
+<link rel="stylesheet" href="./app.css?v=1">
+</head>
+<body>
+<div class="of-app">
+  <header class="of-bar">
+    <div class="of-file">
+      <span class="of-name" id="fileName">Office 编辑器</span>
+      <span class="of-meta" id="fileMeta"></span>
+    </div>
+    <div class="of-actions">
+      <span class="of-mode" id="modeBadge" hidden></span>
+      <button class="button small" id="modeBtn" type="button" hidden></button>
+      <button class="button small" id="reloadBtn" type="button" hidden>重新载入</button>
+      <a class="button small" id="explorerLink" href="/plugins/explorer/" hidden>在文件中显示</a>
+      <a class="button small" id="downloadLink" href="#" hidden>下载</a>
+    </div>
+  </header>
+  <div class="of-stage">
+    <div id="editor" class="of-editor" role="application" aria-label="Office 文档编辑器"></div>
+    <div class="of-placeholder" id="placeholder">
+      <div class="of-card">
+        <p class="of-note" id="note">正在打开文档…</p>
+        <div class="of-new" id="newActions" hidden>
+          <button class="button" type="button" data-kind="word">新建 Word 文档</button>
+          <button class="button" type="button" data-kind="excel">新建 Excel 表格</button>
+          <button class="button" type="button" data-kind="ppt">新建 PPT 演示文稿</button>
+          <a class="button" href="/plugins/explorer/">打开文件浏览器</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="of-banner" id="banner" role="alert" hidden>
+    <div class="of-banner-text" id="bannerText"></div>
+    <button class="button small" id="retryBtn" type="button">重试</button>
+  </div>
+</div>
+<script src="./app.js?v=1" defer></script>
+</body>
+</html>

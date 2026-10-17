@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from urllib.parse import unquote
 
 from workbench import config
 from workbench.errors import WorkbenchError
@@ -21,11 +22,12 @@ from plugins.zotero import client, translate
 class FakeRequest:
     """Captures what a plugin tried to send, without a socket."""
 
-    def __init__(self, method, path, query=None, body=None):
+    def __init__(self, method, path, query=None, body=None, raw_query=""):
         self.method = method
         self.path = path
         self.query = query or {}
         self.body = body or {}
+        self.raw_query = raw_query
         self.sent = []
 
     def json(self, status, payload):
@@ -220,6 +222,100 @@ class AgentsAndVscodeTest(unittest.TestCase):
         self.assertTrue(result.get("error"), result)
 
 
+class ExplorerOpenTest(unittest.TestCase):
+    """The VS Code hand-off must hand over a remote path, not a URI.
+
+    ``code serve-web`` turns only a value that starts with ``/`` into
+    ``vscode-remote://<authority><path>``; anything else is parsed as a
+    standalone URI, which is how "Workspace does not exist" happens.
+    """
+
+    def setUp(self):
+        from plugins.explorer import app
+        self.explorer = app
+
+    def _folder_value(self, payload):
+        prefix = "/vscode/?folder="
+        self.assertTrue(payload["url"].startswith(prefix), payload["url"])
+        return unquote(payload["url"][len(prefix):])
+
+    def _remote(self, folder):
+        """The remote spelling the workbench itself emits for a local folder."""
+        text = Path(folder).resolve().as_posix()
+        if len(text) > 1 and text[1] == ":":
+            return "/" + text[0].lower() + text[1:]
+        return text if text.startswith("/") else "/" + text
+
+    def test_windows_drive_is_spelled_as_a_remote_path(self):
+        # /d:/dir -- forward slashes, leading slash, lower-case drive letter.
+        from workbench import folders
+        self.assertEqual(folders.remote_query(Path("D:/Files/Work")),
+                         "/d%3A/Files/Work")
+        self.assertEqual(folders.remote_query(Path("/srv/data")), "/srv/data")
+
+    def test_vscode_url_is_a_remote_folder_path(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            payload = self.explorer.open_with({"path": folder, "app": "vscode"})
+            self.assertEqual(payload["folder"], str(Path(folder).resolve()))
+            value = self._folder_value(payload)
+        self.assertEqual(value, self._remote(folder))
+        # No backslashes (the workbench reads them as part of a scheme) and a
+        # leading slash, or the editor never enters the remote workspace.
+        self.assertNotIn("\\", value)
+        self.assertTrue(value.startswith("/"), value)
+        self.assertNotIn("file:", value)
+
+    def test_opening_a_file_hands_over_its_folder(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            folder = Path(root) / "with space"
+            folder.mkdir()
+            target = folder / "a b.txt"
+            target.write_text("x", encoding="utf-8")
+            payload = self.explorer.open_with({"path": str(target), "app": "vscode"})
+            value = self._folder_value(payload)
+            expected = self._remote(folder)
+        # One decode of the query gives the raw path back, so a space stays a space.
+        self.assertEqual(value, expected)
+        self.assertIn("with space", value)
+
+
+class VscodeStartFolderTest(unittest.TestCase):
+    """The bare editor tab must open a workspace; stock serve-web shows nothing."""
+
+    def setUp(self):
+        self.registry = load(config.PLUGIN_DIR)
+
+    def test_bare_editor_tab_redirects_to_the_start_folder(self):
+        import tempfile
+
+        from plugins.vscode import proxy
+        from workbench import folders
+
+        plugin = self.registry.by_id("vscode")
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(proxy, "DEFAULT_FOLDER", folder):
+                request = FakeRequest("GET", "/vscode/")
+                self.assertTrue(plugin.handle(request))
+                expected = "folder=" + folders.remote_query(folder)
+        self.assertEqual(request.sent[0], ("redirect", "/vscode/?" + expected))
+
+    def test_a_folder_query_is_proxied_instead_of_redirected(self):
+        from plugins.vscode import proxy
+
+        plugin = self.registry.by_id("vscode")
+        request = FakeRequest("GET", "/vscode/", query={"folder": ["/d%3A/x"]},
+                              raw_query="folder=%2Fd%3A%2Fx")
+        request.raw = object()  # what the proxy relays to
+        with patch.object(proxy, "proxy") as forwarded:
+            self.assertTrue(plugin.handle(request))
+        forwarded.assert_called_once()
+        # No redirect: the browser asked for a specific folder, so proxy as is.
+        self.assertEqual(request.sent, [])
+
+
+
 class HostEndToEndTest(unittest.TestCase):
     """Boot the real server on an ephemeral port and talk HTTP to it."""
 
@@ -258,7 +354,7 @@ class HostEndToEndTest(unittest.TestCase):
         status, body, _ = self._get("/api/plugins")
         self.assertEqual(status, 200)
         ids = sorted(item["id"] for item in json.loads(body)["plugins"])
-        self.assertEqual(ids, ["agents", "vscode", "zotero"])
+        self.assertEqual(ids, ["agents", "explorer", "vscode", "zotero"])
 
     def test_foreign_host_is_rejected(self):
         status, _, _ = self._get("/api/health", {"Host": "evil.example.com"})

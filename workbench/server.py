@@ -121,36 +121,54 @@ class Handler(BaseHTTPRequestHandler):
             path = unquote(parsed.path)
             query = parse_qs(parsed.query)
             body: dict = {}
+            raw_length = 0
             if method == "POST":
-                if not security.mutation_authorized(self.headers):
+                # A plugin may own an endpoint that a foreign process (a document
+                # server's save callback) has to reach without our header.  It
+                # authenticates that request itself, and the manifest says so.
+                if (not security.mutation_authorized(self.headers)
+                        and not self.server.registry.allows_public(path)):
                     return self._json(403, {"error": "missing %s header" % config.SHARED_HEADER,
                                             "code": "unauthorized_mutation"})
-                body = self._read_json()
-                if body is _TOO_LARGE:
-                    return self._json(413, {"error": "body too large",
-                                            "code": "payload_too_large"})
-                if body is None:
-                    return self._json(400, {"error": "invalid JSON body",
-                                            "code": "bad_json"})
+                if self._body_is_json():
+                    body = self._read_json()
+                    if body is _TOO_LARGE:
+                        return self._json(413, {"error": "body too large",
+                                                "code": "payload_too_large"})
+                    if body is None:
+                        return self._json(400, {"error": "invalid JSON body",
+                                                "code": "bad_json"})
+                else:
+                    # A non-JSON body is a plugin's own byte stream (an upload);
+                    # the host only bounds it and leaves the reading to the plugin.
+                    raw_length = self._raw_length()
+                    if raw_length is None:
+                        return self._json(413, {"error": "body too large",
+                                                "code": "payload_too_large"})
 
-            request = Request(self, method, path, query, body, raw_query=parsed.query)
-            if method == "GET" and path == "/api/health":
-                return request.json(200, {"ok": True, "service": config.SERVICE_NAME,
-                                          "version": __version__})
-            if method == "GET" and path == "/api/plugins":
-                return request.json(200, self.server.registry.manifests())
+            request = Request(self, method, path, query, body, raw_query=parsed.query,
+                              raw_length=raw_length)
+            try:
+                if method == "GET" and path == "/api/health":
+                    return request.json(200, {"ok": True, "service": config.SERVICE_NAME,
+                                              "version": __version__})
+                if method == "GET" and path == "/api/plugins":
+                    return request.json(200, self.server.registry.manifests())
 
-            if method == "GET" and wants_standalone(
-                    self.headers.get("Sec-Fetch-Dest"), path,
-                    (item.entry for item in self.server.registry.plugins if item.ready())):
-                return self._serve_static(request, _STANDALONE_PAGE)
+                if method == "GET" and wants_standalone(
+                        self.headers.get("Sec-Fetch-Dest"), path,
+                        (item.entry for item in self.server.registry.plugins if item.ready())):
+                    return self._serve_static(request, _STANDALONE_PAGE)
 
-            owner = self.server.registry.match(path)
-            if owner is not None and owner.handle(request):
-                return
-            if path.startswith("/api/"):
-                return request.json(404, {"error": "not found", "code": "not_found"})
-            return self._serve_static(request, path)
+                owner = self.server.registry.match(path)
+                if owner is not None and owner.handle(request):
+                    return
+                if path.startswith("/api/"):
+                    return request.json(404, {"error": "not found", "code": "not_found"})
+                return self._serve_static(request, path)
+            finally:
+                # An upload the plugin refused mid-way must not poison keep-alive.
+                request.drain_raw()
         except WorkbenchError as exc:
             return self._json(exc.status, {"error": exc.message, "code": exc.code})
         except (BrokenPipeError, ConnectionResetError):
@@ -160,6 +178,27 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # never leak internals to the client
             return self._json(500, {"error": "internal error: %s" % type(exc).__name__,
                                     "code": "internal_error"})
+
+    def _body_is_json(self):
+        """True for the small JSON objects plugins exchange over POST.
+
+        An absent content type keeps the historical attempt-to-parse behaviour;
+        anything explicitly non-JSON (an upload's ``application/octet-stream``)
+        stays on the socket for the plugin to stream.
+        """
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        return not ctype or ctype == "application/json" or ctype.endswith("+json")
+
+    def _raw_length(self):
+        """Bounded Content-Length for a raw body; None when it is too large."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            return 0
+        if length < 0 or length > config.RAW_BODY_LIMIT:
+            self.close_connection = True
+            return None
+        return length
 
     def _read_json(self):
         try:

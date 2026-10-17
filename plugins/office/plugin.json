@@ -1,0 +1,12 @@
+{
+  "id": "office",
+  "name": "Office 编辑器",
+  "description": "在浏览器里编辑 Word、Excel、PPT：由本机 ONLYOFFICE 文档服务渲染，保存直接写回原文件。",
+  "icon": "doc",
+  "kind": "iframe",
+  "entry": "/plugins/office/",
+  "routes": ["/api/office", "/office"],
+  "public": ["/api/office/callback"],
+  "module": "office",
+  "hidden": true
+}

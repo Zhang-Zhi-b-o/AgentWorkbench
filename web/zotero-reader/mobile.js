@@ -286,9 +286,22 @@
 
 	/* ── 翻译 ──────────────────────────────────────────────────────── */
 
+	/** 当前 PDF 的 Zotero 附件 key：服务端靠它算跟桌面端一致的缓存指纹。 */
+	function itemKeyOf() {
+		try {
+			var app = viewerApplication();
+			var match = /\/api\/zotero\/files\/([A-Z0-9]{8})/.exec(String((app && app.url) || ''));
+			return match ? match[1] : '';
+		} catch (error) {
+			return '';
+		}
+	}
+
 	/** 调后端翻译：服务端复用 Translate for Zotero 的配置，密钥不出本机。 */
 	function requestTranslation(text, position, force) {
 		var payload = { text: text, target: 'zh' };
+		var itemKey = itemKeyOf();
+		if (itemKey) payload.itemKey = itemKey;
 		if (position) payload.position = position;
 		if (force) payload.force = true;
 		return fetch(TRANSLATE_URL, {

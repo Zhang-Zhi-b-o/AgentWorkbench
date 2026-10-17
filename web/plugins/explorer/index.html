@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- 文件插件页：左侧快速访问 + 右侧文件列表/预览。
+     地址用 ?path=<绝对路径> 表示当前位置，所以刷新、收藏、以及从 DSH 直接打开
+     某个目录都落在同一个地方。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151517" media="(prefers-color-scheme: dark)">
+<title>文件 · 工作台</title>
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../app.css?v=10">
+<link rel="stylesheet" href="./app.css?v=1">
+</head>
+<body>
+<div class="ex-app">
+<aside class="ex-side" id="sidebar" aria-label="快速访问">
+  <div class="ex-side-head">
+    <span>快速访问</span>
+    <button class="ex-icon-btn ex-side-close" id="sideClose" type="button" title="收起侧栏" aria-label="收起侧栏">×</button>
+  </div>
+  <nav class="ex-quick" id="quickList" aria-busy="true"></nav>
+  <div class="ex-side-foot">
+    <button class="ex-side-link" id="rootBtn" type="button">此电脑</button>
+    <span class="ex-side-hint">整台电脑都可浏览</span>
+  </div>
+</aside>
+
+<section class="ex-main">
+  <header class="ex-bar">
+    <button class="ex-icon-btn ex-side-open" id="sideOpen" type="button" title="展开侧栏" aria-label="展开侧栏">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    </button>
+    <div class="ex-nav" role="group" aria-label="导航">
+      <button class="ex-icon-btn" id="backBtn" type="button" title="后退" aria-label="后退">←</button>
+      <button class="ex-icon-btn" id="forwardBtn" type="button" title="前进" aria-label="前进">→</button>
+      <button class="ex-icon-btn" id="upBtn" type="button" title="上一级" aria-label="上一级">↑</button>
+      <button class="ex-icon-btn" id="refreshBtn" type="button" title="刷新" aria-label="刷新">⟳</button>
+    </div>
+    <nav class="ex-crumbs" id="crumbs" aria-label="当前位置"></nav>
+    <label class="ex-search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+      <input id="searchInput" type="search" inputmode="search" enterkeyhint="search"
+             autocomplete="off" spellcheck="false" placeholder="搜索当前文件夹">
+    </label>
+  </header>
+
+  <div class="ex-toolbar">
+    <div class="ex-menu-wrap">
+      <button class="button small" id="newBtn" type="button" aria-haspopup="menu" aria-expanded="false">＋ 新建</button>
+    </div>
+    <button class="button small" id="uploadBtn" type="button">上传</button>
+    <button class="button small" id="vscodeBtn" type="button" title="用工作台里的 VS Code 打开这个文件夹">VS Code</button>
+    <button class="button small" id="pasteBtn" type="button" disabled title="粘贴到这里">粘贴</button>
+    <span class="ex-spacer"></span>
+    <span class="ex-selinfo" id="selInfo" aria-live="polite"></span>
+    <button class="button small" id="sortBtn" type="button" title="切换排序">名称 ↑</button>
+    <button class="ex-icon-btn" id="viewBtn" type="button" title="切换视图" aria-label="切换视图">▤</button>
+  </div>
+
+  <div class="ex-body">
+    <div class="ex-list" id="list" role="listbox" aria-label="文件列表" tabindex="0" aria-busy="true"></div>
+    <div class="ex-empty" id="empty" hidden></div>
+  </div>
+
+  <div class="ex-statusbar">
+    <span id="statusText">正在读取…</span>
+    <span class="ex-status-right" id="statusRight"></span>
+  </div>
+  <div class="ex-progress" id="progress" hidden><div class="ex-progress-bar" id="progressBar"></div><span id="progressText"></span></div>
+</section>
+</div>
+
+<!-- 右键菜单 / 新建菜单，同一套外观 -->
+<div class="ex-menu" id="menu" role="menu" hidden></div>
+
+<!-- 文本编辑 / 预览 / 确认框共用一层遮罩 -->
+<div class="ex-modal" id="modal" hidden>
+  <div class="ex-modal-card" id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <header class="ex-modal-head">
+      <h2 id="modalTitle">文件</h2>
+      <div class="ex-modal-actions" id="modalActions"></div>
+      <button class="ex-icon-btn" id="modalClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <div class="ex-modal-body" id="modalBody"></div>
+    <footer class="ex-modal-foot" id="modalFoot"></footer>
+  </div>
+</div>
+
+<div class="ex-toast" id="toast" role="status" aria-live="polite" hidden></div>
+<input type="file" id="fileInput" multiple hidden>
+<script src="./app.js?v=1" defer></script>
+</body>
+</html>

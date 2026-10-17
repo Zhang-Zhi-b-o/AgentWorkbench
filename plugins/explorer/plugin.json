@@ -1,0 +1,10 @@
+{
+  "id": "explorer",
+  "name": "文件",
+  "description": "浏览整台电脑：预览与编辑文本、上传下载、复制移动。Word/Excel/PPT 点开即下载，交给设备自带的编辑器打开；也能从任意目录直接打开 VS Code。",
+  "icon": "folder",
+  "kind": "iframe",
+  "entry": "/plugins/explorer/",
+  "routes": ["/api/explorer"],
+  "module": "explorer"
+}

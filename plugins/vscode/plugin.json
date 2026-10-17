@@ -1,6 +1,6 @@
 {
   "id": "vscode",
-  "name": "编辑器",
+  "name": "vscode",
   "description": "在本机的 VS Code Web 里编辑代码，顶栏也能随时切回其它插件。",
   "icon": "code",
   "kind": "link",

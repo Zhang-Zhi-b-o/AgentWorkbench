@@ -1,0 +1,32 @@
+{
+  "name": "dsh-workbench-open",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DSH 会话头部的两个入口：在当前工作区打开 AgentWorkbench 的文件资源管理器与 VS Code（都是新标签页）。",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    }
+  },
+  "license": "MIT"
+}

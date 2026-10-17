@@ -90,7 +90,14 @@ def _child_env() -> dict:
                DEEPSEEK_BASE_URL="https://api.deepseek.com",
                DSH_TELEMETRY_DISABLED="1",
                RELAY_CLAUDE_LINK_PATH=str(DSH_HOME / "claude-dsh-links.json"),
-               RELAY_CODEX_LINK_PATH=str(DSH_HOME / "codex-dsh-links.json"))
+               RELAY_CODEX_LINK_PATH=str(DSH_HOME / "codex-dsh-links.json"),
+               # The DSH plugin "dsh-workbench-open" needs to know which workbench
+               # this browser is looking at: loopback for a local tab, the private
+               # reverse-proxy origin for a phone that came in through it.
+               WORKBENCH_ORIGIN="http://127.0.0.1:%d" % config.PORT,
+               WORKBENCH_REMOTE_ORIGIN=config.REMOTE_ORIGIN,
+               WORKBENCH_DSH_PORT=str(PORT),
+               WORKBENCH_REMOTE_DSH_PORT=str(REMOTE_PORT))
     return env
 
 

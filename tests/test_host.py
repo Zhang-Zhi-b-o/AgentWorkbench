@@ -107,7 +107,7 @@ class RegistryTest(unittest.TestCase):
     def test_real_plugins_load(self):
         registry = load(config.PLUGIN_DIR)
         ids = sorted(plugin.id for plugin in registry.plugins)
-        self.assertEqual(ids, ["agents", "vscode", "zotero"])
+        self.assertEqual(ids, ["agents", "explorer", "vscode", "zotero"])
         for plugin in registry.plugins:
             self.assertEqual(plugin.error, "", plugin.id)
 

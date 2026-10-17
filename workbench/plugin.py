@@ -37,6 +37,12 @@ class Plugin:
     routes: tuple[str, ...]
     module: object | None = None
     error: str = ""
+    # Paths whose POST requests may skip the shared mutation header because a
+    # foreign process (an external document server) is the legitimate caller.
+    public: tuple[str, ...] = ()
+    # Installed but not offered: no nav entry and no routes.  Lets a plugin be
+    # parked from its own manifest instead of deleting the directory.
+    hidden: bool = False
 
     # -- manifest -------------------------------------------------------
     def manifest(self) -> dict:
@@ -130,6 +136,14 @@ class Registry:
     def by_id(self, plugin_id: str) -> Plugin | None:
         return next((p for p in self.plugins if p.id == plugin_id), None)
 
+    def allows_public(self, path: str) -> bool:
+        """True when this path is a plugin's self-authenticated POST endpoint."""
+        for plugin in self.plugins:
+            for prefix in plugin.public:
+                if path == prefix or path.startswith(prefix + "/"):
+                    return True
+        return False
+
     def start(self) -> None:
         for plugin in self.plugins:
             plugin.start()
@@ -172,6 +186,9 @@ def _load_one(manifest_path: Path) -> Plugin | None:
     routes = tuple(str(item) for item in manifest.get("routes") or ())
     if any(not route.startswith("/") for route in routes):
         problems.append("every route must start with '/'")
+    public = tuple(str(item) for item in manifest.get("public") or ())
+    if any(not route.startswith("/") for route in public):
+        problems.append("every public route must start with '/'")
 
     module = None
     module_name = str(manifest.get("module") or plugin_id)
@@ -191,6 +208,8 @@ def _load_one(manifest_path: Path) -> Plugin | None:
         routes=routes,
         module=module,
         error="; ".join(problems),
+        public=public,
+        hidden=bool(manifest.get("hidden")),
     )
 
 
@@ -199,6 +218,6 @@ def load(directory: Path) -> Registry:
     plugins = []
     for manifest_path in sorted(directory.glob("*/plugin.json")):
         plugin = _load_one(manifest_path)
-        if plugin is not None:
+        if plugin is not None and not plugin.hidden:
             plugins.append(plugin)
     return Registry(plugins)

@@ -7,7 +7,7 @@
 
 ![工作台外壳：插件全部就绪](docs/screenshot.png)
 
-一句话概括：**AI 对话、文件管理、Office 编辑、Zotero 阅读、VS Code，全部收在同一个网页里。**
+一句话概括：**AI 对话、文件管理、Office 预览、Zotero 阅读、VS Code，全部收在同一个网页里。**
 手机、平板、另一台电脑打开同一个地址就能用，不需要远程桌面，也不需要为每个工具单独开端口。
 
 ## 插件一览
@@ -15,10 +15,12 @@
 | 插件 | 做什么 | 需要电脑上有什么 |
 |---|---|---|
 | `agents` | 完整的 DSH 对话工作区，可接入 Codex 与 Claude Code | `node` 18+、DSH 运行时（一条 `npm install`，见下文）、一个 DeepSeek API key |
-| `explorer` | 浏览整台电脑：预览与编辑文本、上传下载、复制移动、压缩解压，并能从任意目录直接打开 VS Code 或 Office | 无 |
-| `office` | 在浏览器里编辑 Word、Excel、PPT：由本机 ONLYOFFICE 文档服务渲染，保存直接写回原文件 | 本机安装 ONLYOFFICE Docs（Windows 安装包或 Docker） |
+| `explorer` | 浏览整台电脑：Office 文档预览、文本编辑、上传下载、复制移动、压缩解压，并能从任意目录直接打开 VS Code | 无 |
 | `zotero` | 浏览 Zotero 书库、搜索文献、继续阅读 PDF，并对选中段落划词翻译 | Zotero 桌面端；划词翻译还要装 *Translate for Zotero* 插件并配好自定义 GPT / ChatGPT 服务 |
 | `vscode` | 在壳内用 VS Code Web 写代码，顶栏导航一直可用 | VS Code CLI（`code`） |
+
+第五个插件 `office`（经本机 ONLYOFFICE Docs 在浏览器里编辑）以 `"hidden": true` 停用随包附带：
+它的移动端 Web 编辑器在免费版里只能查看。见 [Office 文档](#office-文档预览--交给设备打开)。
 
 再加一个插件就是一个放两个文件的文件夹。宿主从不按名字 import 插件、也不看插件内部，
 所以加一个工具不需要改宿主。
@@ -53,23 +55,28 @@
   Windows 上删除默认进回收站，也可以选择永久删除。
 - **上传与下载**：从浏览器上传到当前目录；任意文件可以直接下载，图片、PDF 等在原位预览。
 - **压缩与解压**：把文件或文件夹打包成 zip 下载，也能把 zip 解压到指定目录。
-- **打开方式**：右键可以把文件或文件夹交给内置 VS Code（`/vscode/?folder=...`）、
-  Office 编辑器（`/plugins/office/?path=...`），或在 Windows 上用本机默认程序打开。
+- **打开方式**：右键可以把文件或文件夹交给内置 VS Code（`/vscode/?folder=/d:/...`），
+  或在 Windows 上用本机默认程序打开；Office 文档在弹窗里预览，并可下载源文件
+  （见 [Office 文档](#office-文档预览--交给设备打开)）。
 - **安全边界**：所有路径都做规范化与越界检查，不允许通过 `..` 跳出允许的范围。
 
-### Office 编辑器（`office`）
+### Office 文档：预览 + 交给设备打开
 
-工作台不自己实现 Office，而是把文档交给本机的 **ONLYOFFICE Docs** 渲染，浏览器里看到的
-就是 ONLYOFFICE 的编辑器。
+工作台不在浏览器里编辑 Office 文件。在「文件」里点开一个 Office 文档，会弹出**整页预览**：
+由同机安装的 Microsoft Office 把它渲染成只读 PDF；预览右上角的「下载并打开」按钮
+**下载源文件本体**（原样、原名），交给手上这台设备自带的编辑器（iPad 上的 Word / Pages、
+桌面的 Word、或者 WPS）。
 
-- **支持的格式**：Word（.docx）、Excel（.xlsx）、PPT（.pptx）；不支持的扩展名会直接拒绝。
-- **原地保存**：文档服务保存时回调工作台，工作台把改动写回原文件，不需要下载再上传。
-- **新建文档**：页面里可以直接新建 Word / Excel / PPT，复用文件插件的建文件接口，
-  两处生成的是同一种文件。
-- **从文件插件打开**：在「文件」里右键任意 Office 文档，选择 Office 编辑器即可。
-- **回调验签**：保存回调走一次性文件票 + JWT；配置了 `ONLYOFFICE_JWT_SECRET` 时验签，
-  未配置时提示但不阻断。
-- **缺服务时**：页面会说明没检测到文档服务，并给出官方安装包的地址与 Docker 镜像名。
+- **支持的格式**：Word、Excel、PPT（`.docx/.xlsx/.pptx`，以及旧版 `.doc/.xls/.ppt` 与 OpenDocument 系列）。
+- **保真预览、且只读**：由 Office 本身导出 PDF；`data/preview-cache/` 按路径、大小、修改时间
+  缓存结果，第二次打开是瞬时的。PDF 无法原地编辑，这正是我们要的。
+- **下载拿到的是源文件**：预览用的 PDF 不会成为下载内容，按钮给的是原始字节与原始文件名。
+- **为什么不在浏览器里编辑**：ONLYOFFICE Docs 的**桌面** Web 编辑器是免费可编辑的，但它的
+  **移动端** Web 编辑器在免费社区版里只能查看 —— 平板上编辑器能打开，却不接受任何输入。
+  因此 `office` 插件已停用（清单里 `"hidden": true`），改回 `false` 就能恢复编辑器标签页与
+  `/office` 反代。
+- **编辑往返**：用设备自带的 Office 改完，再通过「文件」把文件上传回来
+  （网页本身没有权限直接写宿主机磁盘）。
 
 ### Zotero 阅读（`zotero`）
 
@@ -93,8 +100,13 @@
 - **完整能力**：工作台资源、webview 帧、WebSocket、gzip 压缩都由宿主转发，
   编辑、终端、扩展、Git 面板照常工作。
 - **从文件插件进入**：在「文件」里点「VS Code」，会带着当前文件夹打开：
-  `/vscode/?folder=<路径>`。
-- **独立打开**：直接访问 `/vscode/` 也可以，页面顶部仍带工作台的插件导航。
+  `/vscode/?folder=/d:/...`。这里的值必须是「远端路径」——浏览器端的 VS Code 只有
+  看到以 `/` 开头的值才拼 `vscode-remote://<authority><path>`；直接给 `D:\...` 会被
+  当成 scheme `d` 而丢掉盘符，`file:///D:/...` 则是远端服务不提供的 scheme，
+  两种都会留下一个空资源管理器。
+- **独立打开**：直接访问 `/vscode/` 也可以，页面顶部仍带工作台的插件导航；没带文件夹
+  参数时会跳到插件配置里的 `folder`（`plugins.json`），否则原生 serve-web 只会给一个
+  空的欢迎窗口，没有文件可编辑。
 
 ---
 
@@ -116,7 +128,6 @@ AgentWorkbench listening on http://127.0.0.1:8768
   plugins   5 from /path/to/AgentWorkbench/plugins
   agents    iframe   /agents/           ready
   explorer  iframe   /plugins/explorer/ ready
-  office    iframe   /plugins/office/   ready
   vscode    link     /vscode/           ready
   zotero    iframe   /plugins/zotero/   ready
 ```
@@ -128,7 +139,7 @@ Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必
 
 - 首页是插件卡片，点任意卡片进入对应插件；顶部导航栏可以在插件之间直接切换。
 - 每个插件都有自己的地址，可以直接收藏或用新标签页打开：
-  `/plugins/explorer/`、`/plugins/office/`、`/plugins/zotero/`、`/vscode/`、`/agents/`。
+  `/plugins/explorer/`、`/plugins/zotero/`、`/vscode/`、`/agents/`。
 - 单独打开插件地址时，页面顶部会自动套上工作台的导航栏；壳内打开时不会重复嵌套。
 - 顶部导航可以收起，收起后只留一个细手柄，给内容腾出高度（手机和平板上很有用）。
 
@@ -145,18 +156,16 @@ Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必
 1. 打开「文件」标签，侧栏选一个快速访问目录或盘符。
 2. 点文件夹进入下一级；用 `←` `→` `↑` 和面包屑在目录间移动。
 3. 选中文件后可以下载、重命名、复制、移动、删除；右键菜单里还有「用 VS Code 打开」
-   「用 Office 编辑」「在本机打开」。
+   「在本机打开」。
 4. 工具栏的「＋ 新建」「上传」「粘贴」作用于当前目录；搜索框只搜索当前文件夹。
 5. 压缩：选中若干条目生成 zip 下载；解压：对 zip 文件选择解压目标目录。
 
 ### 编辑 Office 文档
 
-1. 确保本机装好 ONLYOFFICE Docs 并正在运行（Windows 安装包或 Docker 都可以）。
-2. 在「文件」里找到 `.docx` / `.xlsx` / `.pptx`，右键选择「用 Office 编辑」；
-   也可以在「Office 编辑器」里直接新建一个文档。
-3. 编辑后保存，改动直接写回原文件；页面上有「重新载入」「下载」「在文件中显示」。
-4. 如果页面提示未检测到文档服务，按提示安装后重试；JWT 密钥要与 ONLYOFFICE 的
-   `local.json` 保持一致。
+1. 在「文件」里点开 `.docx` / `.xlsx` / `.pptx`，工作台弹出只读预览，右上角有「下载并打开」。
+2. 那个按钮下载的是源文件本体；用它自带编辑器打开（平板上是 Word / Pages，桌面是 Word）。
+3. 改完再通过「文件」上传回来 —— 网页没有权限直接写宿主机磁盘，这一步需要你操作。
+4. 如果预览提示无法渲染，说明宿主机上的 Microsoft Office 缺失或被占用；下载仍然可用。
 
 ### 阅读 Zotero 文献
 
@@ -207,8 +216,8 @@ Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必
 ## 环境要求
 
 - Python 3.10+（宿主和所有自带插件只用标准库）
-- 按插件可选：`node` 18+ 与 DSH 运行时（agents）、ONLYOFFICE Docs（office）、
-  Zotero 桌面端（zotero）、VS Code CLI（vscode）
+- 按插件可选：`node` 18+ 与 DSH 运行时（agents）、Zotero 桌面端（zotero）、
+  VS Code CLI（vscode）；Office 预览另外用上宿主机已装的 Microsoft Office（有就用）
 - `explorer` 没有额外依赖
 
 宿主是纯 Python，测试在 CI 上同时跑 Windows 与 Linux；但日常使用是 Windows：启动器与
@@ -249,11 +258,14 @@ npm install --prefix "$PWD/data/dsh-runtime" @deepseek-ai/dsh
 之后还需要一个 DeepSeek API key，见 [DeepSeek key](#deepseek-key)。这两样缺任何一个，
 置灰的卡片和 `/agents/` 返回的 `503` 都会打印你这台机器上该跑的那条命令，不用自己猜路径。
 
-### 安装 Office 文档服务（`office` 插件）
+### Office 预览（可选）
 
-从 [ONLYOFFICE Docs 官方下载页](https://download.onlyoffice.com/install/documentserver/windows/onlyoffice-documentserver.exe)
-安装 Windows 版，或运行 Docker 镜像 `onlyoffice/documentserver`。装好后工作台会自动探测；
-需要保存回调验签时，把文档服务的 JWT 密钥写进环境变量 `ONLYOFFICE_JWT_SECRET`。
+预览由宿主机上已装的 Microsoft Office 生成，装着就无需任何额外安装。如果还想把停用的
+`office` 插件恢复回来，从
+[ONLYOFFICE Docs 官方下载页](https://download.onlyoffice.com/install/documentserver/windows/onlyoffice-documentserver.exe)
+安装 Windows 版，或运行 Docker 镜像 `onlyoffice/documentserver`，再把
+`plugins/office/plugin.json` 里的 `"hidden"` 改成 `false`；需要保存回调验签时，把文档服务的
+JWT 密钥写进环境变量 `ONLYOFFICE_JWT_SECRET`。
 
 ## 配置
 
@@ -333,8 +345,8 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
   跑在 webview iframe 里，iOS Safari 对跨源 iframe、Service Worker 和宿主机名校验的
   限制会让面板空白或无法加载。编辑器本身的编辑、终端、文件操作不受影响；需要 AI 对话时
   用工作台自带的「AI 对话」插件。
-- **Office 依赖本机文档服务。** 没装 ONLYOFFICE Docs 时，`office` 插件页面会提示并
-  给出安装地址，其余插件不受影响。
+- **Office 预览依赖宿主机上的 Office。** 只有生成预览那一步用到它；下载按钮与其余插件
+  在没装 Office 的机器上照常工作。
 
 ## 加一个插件
 

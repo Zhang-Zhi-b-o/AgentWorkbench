@@ -38,7 +38,7 @@ Issues = "https://github.com/Zhang-Zhi-b-o/AgentWorkbench/issues"
 workbench = "workbench.server:main"
 
 [tool.setuptools]
-packages = ["workbench", "plugins", "plugins.agents", "plugins.zotero", "plugins.vscode"]
+packages = ["workbench", "plugins", "plugins.agents", "plugins.explorer", "plugins.office", "plugins.zotero", "plugins.vscode"]
 
 [tool.pytest.ini_options]
 # Without this, a bare ``pytest`` walks into installed runtimes (a VS Code server
