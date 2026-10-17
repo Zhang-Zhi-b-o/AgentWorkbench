@@ -431,17 +431,92 @@
     }
   }
 
-  /* PDF 阅读器 */
-  function mountReader() {
-    frame = document.createElement('iframe');
-    frame.className = 'reader-frame';
-    frame.title = 'PDF 阅读器';
-    frame.src = READER;
-    RH.append(frame);
+  /* PDF 阅读器
+     官方 reader.html 只是一个空壳：必须由父页面拿到同源的 contentWindow，
+     调 createReader() 把 pdf 地址和中文语言包传进去，否则整页空白。 */
+  let readerIndex = 0;
+  let readerNote = null;
+
+  function readerStatus(text) {
+    if (!readerNote) {
+      readerNote = mk('p', 'reader-notice');
+      readerNote.setAttribute('role', 'status');
+      RH.append(readerNote);
+    }
+    readerNote.textContent = text || '';
+    readerNote.hidden = !text;
   }
-  function openReader() {
+
+  async function injectReader(file) {
+    const win = frame && frame.contentWindow;
+    const doc = frame && frame.contentDocument;
+    if (!win || !doc) return;
+    try {
+      readerStatus('正在加载阅读器…');
+      if (typeof win.createReader !== 'function') throw new Error('官方阅读器未就绪，请重试。');
+      doc.documentElement.lang = 'zh-CN';
+      const ftl = await Promise.all(['zotero', 'reader', 'brand'].map(async (name) => {
+        const response = await fetch('/zotero-reader/locales/zh-CN/' + name + '.ftl');
+        if (!response.ok) throw new Error('中文界面资源加载失败。');
+        return response.text();
+      }));
+      if (!frame || !frame.isConnected || !frame.dataset.key || frame.dataset.key !== file.key) return;
+      const native = win.createReader({
+        type: 'pdf',
+        data: { url: new URL(file.url, location.origin).href },
+        ftl: ftl,
+        title: str(file.title),
+        annotations: [],
+        readOnly: false,
+        loggedIn: false,
+        authorName: '网页阅读',
+        sidebarOpen: frame.clientWidth >= 900,
+        sidebarView: 'outline',
+        sidebarWidth: 240,
+        colorScheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+        onChangeViewState: () => {},
+        onSaveAnnotations: () => {},
+        onDeleteAnnotations: () => {},
+        onOpenLink: (url) => {
+          if (/^https?:/i.test(str(url))) window.open(url, '_blank', 'noopener,noreferrer');
+        },
+        onConfirm: (_title, text) => window.confirm(text),
+        onSetDataTransferAnnotations: () => {},
+        onToggleSidebar: () => {},
+        onChangeSidebarWidth: () => {},
+        onChangeSidebarView: () => {},
+        onTextSelectionAnnotationModeChange: () => {},
+        onSaveCustomThemes: () => {},
+        onSetLightTheme: () => {},
+        onSetDarkTheme: () => {}
+      });
+      const initialized = await native._primaryView.initializedPromise;
+      if (initialized === false) throw new Error('PDF 打开失败，请确认附件仍可访问。');
+      readerStatus('');
+    } catch (error) {
+      readerStatus((error && error.message) || '阅读器加载失败');
+    }
+  }
+
+  function mountReader(file) {
+    if (!frame) {
+      frame = document.createElement('iframe');
+      frame.className = 'reader-frame';
+      frame.title = 'PDF 阅读器';
+      RH.append(frame);
+    }
+    frame.dataset.key = file.key;
+    readerStatus('');
+    frame.onload = () => { void injectReader(file); };
+    frame.src = READER;
+  }
+
+  function openReader(index) {
+    const file = pdfs[Number.isInteger(index) ? index : readerIndex];
+    if (!file) return;
+    readerIndex = pdfs.indexOf(file);
     setView('reader');
-    if (!frame) mountReader();
+    mountReader(file);
     focus(BB);
   }
   function closeReader() {
@@ -509,7 +584,7 @@
   RTC.addEventListener('click', loadConfig);
   PL.addEventListener('click', (event) => {
     const button = event.target.closest('.pdf-button');
-    if (button && pdfs[Number(button.dataset.pdf)]) openReader();
+    if (button && pdfs[Number(button.dataset.pdf)]) openReader(Number(button.dataset.pdf));
   });
   TA.addEventListener('input', updateCount);
   TB.addEventListener('click', translate);

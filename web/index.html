@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#151517" media="(prefers-color-scheme: dark)">
 <title>工作台</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="./app.css?v=5">
+<link rel="stylesheet" href="./app.css?v=7">
 </head>
 <body>
 <a class="skip-link" href="#content">跳到主要内容</a>
@@ -20,11 +20,9 @@
 <a class="tab-external" id="openInTab" href="#" target="_blank" rel="noopener noreferrer" hidden>新标签页 ↗</a>
 </div></header>
 <main class="main" id="content" tabindex="-1">
-<section class="home" id="homeView" aria-labelledby="homeTitle">
+<section class="home" id="homeView" aria-label="工作台首页">
 <div class="home-hero">
-<p class="kicker">个人工作台</p>
-<h1 id="homeTitle">把工具放在手边，<br><em>把注意力留给工作。</em></h1>
-<p class="lead">按需载入的自托管工作空间。切换插件时，页面状态会保留。</p>
+<p class="lead">你的远程工作台：AI 对话、Zotero 阅读、编辑器，一个入口。</p>
 <div class="hero-meta"><span class="count" id="pluginCount">正在读取插件</span></div>
 </div>
 <div class="load-error" id="loadError" role="alert" hidden><div><b>无法读取插件清单</b><p id="loadErrorText"></p></div><button class="button" id="retryPlugins" type="button">重试</button></div>
@@ -37,6 +35,6 @@
 <div class="plugin-views" id="pluginViews" hidden></div>
 </main>
 </div>
-<script src="./app.js?v=5" defer></script>
+<script src="./app.js?v=7" defer></script>
 </body>
 </html>

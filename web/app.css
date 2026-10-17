@@ -145,3 +145,14 @@ a.plugin-card:hover{border-color:var(--line-strong);background:var(--soft)}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
+
+/* 手机上把导航压成图标条：三个插件标签必须同时可见，否则看上去像"插件不见了" */
+@media(max-width:560px){
+  .nav-label{display:none}
+  .nav-tab{width:36px;padding:0;justify-content:center}
+  #navToggleLabel{display:none}
+  .nav-toggle{padding:0 9px}
+  .tab-external{font-size:0;padding:0 9px}
+  .tab-external::before{content:"↗";font-size:13px;font-weight:700}
+  .home .lead{font-size:12.5px}
+}
