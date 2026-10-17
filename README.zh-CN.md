@@ -5,18 +5,181 @@
 一个自托管的随身工作台：把「远程用自己那台电脑」变成打开一个网页。宿主只做插件目录与
 转发，每个工具一个独立插件。为**私有网络（Tailscale）**和**慢速、高延迟链路**而设计。
 
-![工作台外壳：三个插件，全部就绪](docs/screenshot.png)
+![工作台外壳：插件全部就绪](docs/screenshot.png)
 
-自带三个插件：
+一句话概括：**AI 对话、文件管理、Office 编辑、Zotero 阅读、VS Code，全部收在同一个网页里。**
+手机、平板、另一台电脑打开同一个地址就能用，不需要远程桌面，也不需要为每个工具单独开端口。
+
+## 插件一览
 
 | 插件 | 做什么 | 需要电脑上有什么 |
 |---|---|---|
 | `agents` | 完整的 DSH 对话工作区，可接入 Codex 与 Claude Code | `node` 18+、DSH 运行时（一条 `npm install`，见下文）、一个 DeepSeek API key |
-| `zotero` | 浏览 Zotero 书库、读 PDF、划词翻译 | Zotero 桌面端；划词翻译还要装 *Translate for Zotero* 插件并配好自定义 GPT / ChatGPT 服务 |
+| `explorer` | 浏览整台电脑：预览与编辑文本、上传下载、复制移动、压缩解压，并能从任意目录直接打开 VS Code 或 Office | 无 |
+| `office` | 在浏览器里编辑 Word、Excel、PPT：由本机 ONLYOFFICE 文档服务渲染，保存直接写回原文件 | 本机安装 ONLYOFFICE Docs（Windows 安装包或 Docker） |
+| `zotero` | 浏览 Zotero 书库、搜索文献、继续阅读 PDF，并对选中段落划词翻译 | Zotero 桌面端；划词翻译还要装 *Translate for Zotero* 插件并配好自定义 GPT / ChatGPT 服务 |
 | `vscode` | 在壳内用 VS Code Web 写代码，顶栏导航一直可用 | VS Code CLI（`code`） |
 
-第四个插件就是一个放两个文件的文件夹。宿主从不按名字 import 插件、也不看插件内部，
+再加一个插件就是一个放两个文件的文件夹。宿主从不按名字 import 插件、也不看插件内部，
 所以加一个工具不需要改宿主。
+
+---
+
+## 功能详解
+
+### AI 对话（`agents`）
+
+把本机的 DSH 对话工作区整个搬进工作台。插件负责启动和管理一个独立的 DSH Web 进程，
+并把 Codex、Claude Code 作为可切换的 agent 接进来。
+
+- **多 agent**：同一个工作区里可以在 Codex 与 Claude Code 之间切换，对话上下文由 DSH 管理。
+- **独立 origin**：DSH 没有 base-path 选项，所以 `/agents/` 用 `302` 跳到它自己的回环端口；
+  从浏览器看仍然是「工作台里的一个标签」，实际是 DSH 自己的页面。
+- **自动启停**：第一次打开时按需拉起 DSH；宿主退出时一起结束。端口被占用时会直接说明。
+- **工作区入口**：配套的 `dsh-workbench-open` 集成会在 DSH 会话头部放两个链接，
+  分别是「用工作台的文件管理器打开当前目录」和「用工作台的 VS Code 打开当前目录」，
+  都是从 DSH 跳到工作台的另一个插件，不用手动找路径。
+- **密钥隔离**：DeepSeek key 只注入 DSH 子进程，不会出现在页面、响应或日志里。
+
+### 文件（`explorer`）
+
+一个跑在浏览器里的资源管理器，范围是整台电脑。
+
+- **快速访问**：侧栏列出桌面、文档、下载等已知目录和所有盘符，可以随时切到「此电脑」。
+- **浏览**：前进 / 后退 / 上一级 / 刷新、可点击的面包屑、当前文件夹内搜索、名称排序、
+  列表与网格两种视图。
+- **预览与编辑**：直接打开文本文件查看和修改，保存即写回原文件（大文件有读取上限）。
+- **文件操作**：新建文件夹、新建文本文件、重命名、复制、移动、删除。
+  Windows 上删除默认进回收站，也可以选择永久删除。
+- **上传与下载**：从浏览器上传到当前目录；任意文件可以直接下载，图片、PDF 等在原位预览。
+- **压缩与解压**：把文件或文件夹打包成 zip 下载，也能把 zip 解压到指定目录。
+- **打开方式**：右键可以把文件或文件夹交给内置 VS Code（`/vscode/?folder=...`）、
+  Office 编辑器（`/plugins/office/?path=...`），或在 Windows 上用本机默认程序打开。
+- **安全边界**：所有路径都做规范化与越界检查，不允许通过 `..` 跳出允许的范围。
+
+### Office 编辑器（`office`）
+
+工作台不自己实现 Office，而是把文档交给本机的 **ONLYOFFICE Docs** 渲染，浏览器里看到的
+就是 ONLYOFFICE 的编辑器。
+
+- **支持的格式**：Word（.docx）、Excel（.xlsx）、PPT（.pptx）；不支持的扩展名会直接拒绝。
+- **原地保存**：文档服务保存时回调工作台，工作台把改动写回原文件，不需要下载再上传。
+- **新建文档**：页面里可以直接新建 Word / Excel / PPT，复用文件插件的建文件接口，
+  两处生成的是同一种文件。
+- **从文件插件打开**：在「文件」里右键任意 Office 文档，选择 Office 编辑器即可。
+- **回调验签**：保存回调走一次性文件票 + JWT；配置了 `ONLYOFFICE_JWT_SECRET` 时验签，
+  未配置时提示但不阻断。
+- **缺服务时**：页面会说明没检测到文档服务，并给出官方安装包的地址与 Docker 镜像名。
+
+### Zotero 阅读（`zotero`）
+
+围绕 Zotero 官方本地 API（回环 `23119`）做的一个只读阅读界面。
+
+- **书库浏览**：按集合和全部条目浏览，左侧分类，右侧条目列表。
+- **搜索**：按标题、作者等字段搜索条目，服务端分页，每次 25 条，滚动到底继续加载。
+- **文献详情**：作者、出版信息、摘要、附件列表。
+- **PDF 阅读**：直接在工作台里流式打开条目的 PDF 附件，支持拖动进度条（Range 请求）。
+- **划词翻译**：选中段落即可翻译，翻译服务复用 *Translate for Zotero* 里已经配置好的
+  OpenAI 兼容服务，不需要在工作台里再填一遍 key。
+- **自动启动 Zotero**：本地 API 没响应时，可以按配置自动把 Zotero 桌面端拉起来；
+  自动找不到可执行文件时，在 `plugins.json` 里指定路径。
+
+### 编辑器（`vscode`）
+
+在壳内使用 VS Code Web（`code serve-web`），并且是由宿主**反向代理**进来的，不是跳转。
+
+- **同源**：`/vscode/` 走工作台自己的 origin，手机和平板只需要工作台这一个入口，
+  不需要为编辑器再开第二个对外端口。
+- **完整能力**：工作台资源、webview 帧、WebSocket、gzip 压缩都由宿主转发，
+  编辑、终端、扩展、Git 面板照常工作。
+- **从文件插件进入**：在「文件」里点「VS Code」，会带着当前文件夹打开：
+  `/vscode/?folder=<路径>`。
+- **独立打开**：直接访问 `/vscode/` 也可以，页面顶部仍带工作台的插件导航。
+
+---
+
+## 使用方法
+
+### 第一次运行
+
+```bash
+git clone https://github.com/Zhang-Zhi-b-o/AgentWorkbench.git
+cd AgentWorkbench
+python -m workbench
+```
+
+然后打开 <http://127.0.0.1:8768/>。启动时宿主会打印数据目录和每个插件的探测结果：
+
+```
+AgentWorkbench listening on http://127.0.0.1:8768
+  data      /path/to/AgentWorkbench/data
+  plugins   5 from /path/to/AgentWorkbench/plugins
+  agents    iframe   /agents/           ready
+  explorer  iframe   /plugins/explorer/ ready
+  office    iframe   /plugins/office/   ready
+  vscode    link     /vscode/           ready
+  zotero    iframe   /plugins/zotero/   ready
+```
+
+缺依赖的插件显示 `not available`：卡片置灰，并直接说明缺什么，其余插件照常工作。
+Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必要时后台启动再打开浏览器。
+
+### 打开工作台
+
+- 首页是插件卡片，点任意卡片进入对应插件；顶部导航栏可以在插件之间直接切换。
+- 每个插件都有自己的地址，可以直接收藏或用新标签页打开：
+  `/plugins/explorer/`、`/plugins/office/`、`/plugins/zotero/`、`/vscode/`、`/agents/`。
+- 单独打开插件地址时，页面顶部会自动套上工作台的导航栏；壳内打开时不会重复嵌套。
+- 顶部导航可以收起，收起后只留一个细手柄，给内容腾出高度（手机和平板上很有用）。
+
+### AI 对话
+
+1. 先按下一节装好 DSH 运行时和 DeepSeek key。
+2. 打开「AI 对话」标签，第一次会自动启动 DSH，等它就绪。
+3. 在 DSH 里新建会话，按需要选择 Codex 或 Claude Code 作为 agent。
+4. 在会话里需要看文件或改代码时，用会话头部的「文件」「VS Code」入口跳到对应插件，
+   路径会自动带上当前工作区。
+
+### 浏览和操作文件
+
+1. 打开「文件」标签，侧栏选一个快速访问目录或盘符。
+2. 点文件夹进入下一级；用 `←` `→` `↑` 和面包屑在目录间移动。
+3. 选中文件后可以下载、重命名、复制、移动、删除；右键菜单里还有「用 VS Code 打开」
+   「用 Office 编辑」「在本机打开」。
+4. 工具栏的「＋ 新建」「上传」「粘贴」作用于当前目录；搜索框只搜索当前文件夹。
+5. 压缩：选中若干条目生成 zip 下载；解压：对 zip 文件选择解压目标目录。
+
+### 编辑 Office 文档
+
+1. 确保本机装好 ONLYOFFICE Docs 并正在运行（Windows 安装包或 Docker 都可以）。
+2. 在「文件」里找到 `.docx` / `.xlsx` / `.pptx`，右键选择「用 Office 编辑」；
+   也可以在「Office 编辑器」里直接新建一个文档。
+3. 编辑后保存，改动直接写回原文件；页面上有「重新载入」「下载」「在文件中显示」。
+4. 如果页面提示未检测到文档服务，按提示安装后重试；JWT 密钥要与 ONLYOFFICE 的
+   `local.json` 保持一致。
+
+### 阅读 Zotero 文献
+
+1. 确保 Zotero 桌面端已登录并至少有本地书库；没开的话插件会尝试自动拉起。
+2. 打开「Zotero 阅读」，左侧选集合或「全部条目」，右侧浏览和搜索。
+3. 点条目查看元数据；点附件里的 PDF 直接在工作台内阅读，支持进度跳转。
+4. 在 PDF 里选中文字，点翻译即可得到译文。翻译服务来自 *Translate for Zotero* 的配置；
+   没配置时页面会说明缺什么。
+
+### 用 VS Code 写代码
+
+- 从「文件」里进入目标文件夹，点工具栏的「VS Code」，会带着该文件夹打开编辑器。
+- 也可以直接打开 `/vscode/`，在 VS Code 自己的文件选择器里选目录；
+  默认目录由 `plugins.json` 的 `vscode.folder` 决定。
+- 编辑器里的顶栏导航仍然可用，可以随时切回其他插件。
+
+### 从手机或平板使用
+
+1. 在电脑上用 Tailscale 暴露工作台（见「远程访问」）。
+2. 手机上打开工作台地址，用法与桌面浏览器一致。
+3. 建议把页面添加到主屏幕，按 PWA 方式使用。
+4. 编辑器在手机上可用；但 **VS Code 扩展的 webview 面板在 iOS Safari 上不可用**，
+   详见「已知限制」。
 
 ---
 
@@ -37,19 +200,20 @@
   WebSocket、gzip 压缩都走这里——所以手机和别的功能同一个 origin，**不需要第二个对外端口**。
 - **`agents` 必须独占一个 origin。** DSH 没有 base-path 选项
   （`dsh web --help` 里没有这类参数），所以 `/agents/` 用 `302` 跳到它自己的回环端口。
-  同一个反向代理给它加一条映射即可，另外两个插件什么都不用加。
+  同一个反向代理给它加一条映射即可，其它插件什么都不用加。
 - **靠清单，不靠 import。** 外壳渲染什么由 `GET /api/plugins` 决定，路由表就是
   `plugins/*/plugin.json`。
 
 ## 环境要求
 
 - Python 3.10+（宿主和所有自带插件只用标准库）
-- 按插件可选：`node` 18+ 与 DSH 运行时（agents）、Zotero 桌面端（zotero）、
-  VS Code CLI（vscode）
+- 按插件可选：`node` 18+ 与 DSH 运行时（agents）、ONLYOFFICE Docs（office）、
+  Zotero 桌面端（zotero）、VS Code CLI（vscode）
+- `explorer` 没有额外依赖
 
 宿主是纯 Python，测试在 CI 上同时跑 Windows 与 Linux；但日常使用是 Windows：启动器与
 远程访问脚本是 PowerShell，`zotero` / `vscode` 两个插件也按 Windows 的安装位置查找。
-Linux 或 macOS 上宿主和外壳能跑，这两个插件会说明自己缺什么。
+Linux 或 macOS 上宿主和外壳能跑，这些插件会说明自己缺什么。
 
 ## 启动
 
@@ -59,18 +223,7 @@ cd AgentWorkbench
 python -m workbench
 ```
 
-然后打开 <http://127.0.0.1:8768/>。启动时宿主会打印数据目录和每个插件的探测结果：
-
-```
-AgentWorkbench listening on http://127.0.0.1:8768
-  data      /path/to/AgentWorkbench/data
-  plugins   3 from /path/to/AgentWorkbench/plugins
-  agents    iframe   /agents/           ready
-  vscode    link     /vscode/           ready
-  zotero    iframe   /plugins/zotero/   ready
-```
-
-缺依赖的插件显示 `not available`：卡片置灰，并直接说明缺什么，其余插件照常工作。
+然后打开 <http://127.0.0.1:8768/>。启动输出见「第一次运行」。
 
 Windows 下也可以直接跑 `start.ps1`：它复用已在运行的实例，必要时后台启动再打开浏览器。
 
@@ -95,6 +248,12 @@ npm install --prefix "$PWD/data/dsh-runtime" @deepseek-ai/dsh
 
 之后还需要一个 DeepSeek API key，见 [DeepSeek key](#deepseek-key)。这两样缺任何一个，
 置灰的卡片和 `/agents/` 返回的 `503` 都会打印你这台机器上该跑的那条命令，不用自己猜路径。
+
+### 安装 Office 文档服务（`office` 插件）
+
+从 [ONLYOFFICE Docs 官方下载页](https://download.onlyoffice.com/install/documentserver/windows/onlyoffice-documentserver.exe)
+安装 Windows 版，或运行 Docker 镜像 `onlyoffice/documentserver`。装好后工作台会自动探测；
+需要保存回调验签时，把文档服务的 JWT 密钥写进环境变量 `ONLYOFFICE_JWT_SECRET`。
 
 ## 配置
 
@@ -170,6 +329,12 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
 - **还没到 1.0。** 插件与宿主之间的接口、HTTP 路由都可能在小版本里变。
 - **自带的 Zotero reader 是构建产物**（`web/zotero-reader/`，约 10 MB）。来源与构建方法见
   [NOTICE.md](NOTICE.md)。
+- **VS Code 扩展的 webview 在 iPad 上不可用。** Claude Code、Codex 这类扩展的界面全部
+  跑在 webview iframe 里，iOS Safari 对跨源 iframe、Service Worker 和宿主机名校验的
+  限制会让面板空白或无法加载。编辑器本身的编辑、终端、文件操作不受影响；需要 AI 对话时
+  用工作台自带的「AI 对话」插件。
+- **Office 依赖本机文档服务。** 没装 ONLYOFFICE Docs 时，`office` 插件页面会提示并
+  给出安装地址，其余插件不受影响。
 
 ## 加一个插件
 
@@ -221,6 +386,7 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
 - JSON 响应递归脱敏：`api_key` 这类键名、以及长得像 bearer token 的值，一律替换成
   `[REDACTED]`。
 - 静态路径一律解析在 `web/` 之下，路径穿越直接拒绝。
+- 文件插件对每个路径做规范化与越界检查；Office 回调使用一次性文件票和 JWT 验签。
 - 插件的状态路由永不返回 DSH 的浏览器握手 token 或 API key。
 
 ## 开发
@@ -239,7 +405,9 @@ python -m pytest          # 40 个测试：安全闸门、路由、缓存策略�
 workbench/    宿主：config、errors、插件注册表、request 外观、server
 plugins/      一个插件一个包，各自带 plugin.json
 web/          外壳、插件页面，以及自带的 Zotero reader
+web/plugins/  自带插件的页面（explorer / office / zotero）
 web/zotero-reader/   官方 Zotero reader 的构建产物（见 NOTICE.md）
+integrations/ dsh-workbench-open：DSH 会话头部的「打开文件 / VS Code」入口
 docs/         上面那张截图
 tests/
 ```
