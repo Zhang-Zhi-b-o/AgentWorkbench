@@ -163,6 +163,31 @@ class AgentsAndVscodeTest(unittest.TestCase):
             plugin = self.registry.by_id(plugin_id)
             self.assertFalse(plugin.handle(FakeRequest("GET", "/api/other")))
 
+    def test_ensure_returns_when_its_port_is_taken(self):
+        """Regression: ensure() reported through status() while holding the lock.
+
+        With a non-reentrant lock that deadlocked the request thread, so the
+        browser saw a connection that never answered.
+        """
+        import socket
+        import threading
+
+        from plugins import agents
+
+        real_port = agents.PORT
+        with socket.socket() as occupied:
+            occupied.bind(("127.0.0.1", 0))
+            occupied.listen(1)
+            agents.PORT = occupied.getsockname()[1]
+            result = {}
+            worker = threading.Thread(target=lambda: result.update(agents.ensure()),
+                                      daemon=True)
+            worker.start()
+            worker.join(10)
+            agents.PORT = real_port
+        self.assertFalse(worker.is_alive(), "agents.ensure() deadlocked")
+        self.assertTrue(result.get("error"), result)
+
 
 class HostEndToEndTest(unittest.TestCase):
     """Boot the real server on an ephemeral port and talk HTTP to it."""

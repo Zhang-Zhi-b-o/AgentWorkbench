@@ -32,7 +32,8 @@ FOLDER_SETTING = str(config.plugin_setting("vscode", "folder", ""))
 SERVER_DIR = config.HOME / "vscode-server"
 
 _READY_TIMEOUT = 90.0
-_lock = threading.Lock()
+# Re-entrant: ensure() reports through status() while it still holds the lock.
+_lock = threading.RLock()
 _state = {"process": None, "port": 0, "error": "", "started": 0.0}
 
 

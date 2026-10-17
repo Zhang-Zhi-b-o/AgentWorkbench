@@ -34,7 +34,8 @@ ENV_FILE = config.HOME / "agent-env.json"
 BINARY = RUNTIME / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
 
 _READY_TIMEOUT = 90.0
-_lock = threading.Lock()
+# Re-entrant: ensure() reports through status() while it still holds the lock.
+_lock = threading.RLock()
 _state = {"process": None, "ready": False, "error": "", "started": 0.0,
           "launch_url": ""}
 
@@ -90,6 +91,18 @@ def _child_env() -> dict:
 def available() -> bool:
     """Cheap probe: installed runtime plus a node on PATH.  Starts nothing."""
     return BINARY.is_file() and shutil.which("node") is not None
+
+
+def _assert_port_free() -> None:
+    """Fail with a readable message instead of a raw socket error."""
+    try:
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", PORT))
+    except OSError as exc:
+        raise WorkbenchError(
+            "端口 %d 已被占用（多半是另一个 DSH 实例还在运行），"
+            "请先停止它，或在 plugins.json 里改用别的 agents.port。" % PORT,
+            status=503, code="agents_port_in_use") from exc
 
 
 def _http_ready() -> bool:
@@ -150,8 +163,7 @@ def ensure() -> dict:
         if process is None or process.poll() is not None:
             try:
                 env = _child_env()
-                with socket.socket() as probe:
-                    probe.bind(("127.0.0.1", PORT))
+                _assert_port_free()
                 argv = [str(Path(shutil.which("node")).resolve()), str(BINARY.resolve()),
                         "--profile", "web", "--host", "127.0.0.1", "--port", str(PORT),
                         "--no-open"]

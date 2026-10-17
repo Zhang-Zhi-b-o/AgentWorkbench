@@ -1,86 +1,43 @@
 <!doctype html>
-<!-- 工作台外壳：提供顶部导航、插件首页与插件内容容器。 -->
+<!-- 工作台外壳：顶部插件导航、首页卡片与 iframe 内容区。 -->
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f3f0e8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#101613" media="(prefers-color-scheme: dark)">
-  <title>工作台</title>
-  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./app.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3f0e8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101613" media="(prefers-color-scheme: dark)">
+<title>工作台</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./app.css">
 </head>
 <body>
-  <a class="skip-link" href="#content">跳到主要内容</a>
-  <div class="app">
-    <header class="topbar">
-      <div class="topbar-inner">
-        <a class="brand" href="#home" aria-label="工作台首页">
-          <img class="brand-mark" src="./favicon.svg" width="34" height="34" alt="">
-          <span class="brand-name">工作台</span>
-          <span class="brand-dot" aria-hidden="true"></span>
-        </a>
-        <button class="nav-toggle" id="navToggle" type="button" aria-expanded="true" aria-controls="pluginNav">
-          <svg class="nav-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 8h14M5 16h9"></path>
-          </svg>
-          <span id="navToggleLabel">收起导航</span>
-        </button>
-        <nav class="plugin-nav" id="pluginNav" aria-label="插件导航" aria-busy="true">
-          <div class="nav-tabs" id="navTabs">
-            <span class="nav-skeleton" aria-hidden="true"></span>
-            <span class="nav-skeleton" aria-hidden="true"></span>
-            <span class="nav-skeleton short" aria-hidden="true"></span>
-          </div>
-        </nav>
-      </div>
-    </header>
-
-    <main class="main" id="content" tabindex="-1">
-      <section class="home" id="homeView" aria-labelledby="homeTitle">
-        <div class="home-hero">
-          <p class="kicker">个人工作台</p>
-          <h1 id="homeTitle">把工具放在手边，<br><em>把注意力留给工作。</em></h1>
-          <p class="lead">按需载入的自托管工作空间。切换插件时，页面状态会保留。</p>
-          <div class="hero-meta">
-            <span class="count" id="pluginCount">正在读取插件</span>
-            <span class="meta-note">本地运行，无需构建</span>
-          </div>
-        </div>
-
-        <div class="load-error" id="loadError" role="alert" hidden>
-          <div>
-            <strong>无法读取插件清单</strong>
-            <p id="loadErrorText"></p>
-          </div>
-          <button class="button" id="retryPlugins" type="button">重试</button>
-        </div>
-
-        <div class="section-heading">
-          <h2>插件</h2>
-          <p>选择一个工具开始</p>
-        </div>
-
-        <div class="plugin-grid" id="pluginGrid" aria-live="polite" aria-busy="true">
-          <div class="skeleton-card" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
-          <div class="skeleton-card" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
-          <div class="skeleton-card" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
-        </div>
-
-        <div class="empty-state" id="homeEmpty" hidden>
-          <strong>还没有可用插件</strong>
-          <p>服务返回的插件列表为空。添加插件后刷新即可看到。</p>
-        </div>
-
-        <footer class="home-foot">
-          <span>本地优先</span>
-          <span>插件状态实时读取</span>
-        </footer>
-      </section>
-
-      <div class="plugin-views" id="pluginViews" hidden></div>
-    </main>
-  </div>
-  <script src="./app.js" defer></script>
+<a class="skip-link" href="#content">跳到主要内容</a>
+<div class="app">
+<header class="topbar"><div class="topbar-inner">
+<a class="brand" href="#home" aria-label="工作台首页"><img class="brand-mark" src="./favicon.svg" width="34" height="34" alt=""><span class="brand-name">工作台</span></a>
+<button class="nav-toggle" id="navToggle" type="button" aria-expanded="true" aria-controls="pluginNav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M5 16h9"/></svg><span id="navToggleLabel">收起导航</span></button>
+<nav class="plugin-nav" id="pluginNav" aria-label="插件导航" aria-busy="true"><div class="nav-tabs" id="navTabs"><span class="nav-skeleton" aria-hidden="true"></span><span class="nav-skeleton" aria-hidden="true"></span><span class="nav-skeleton short" aria-hidden="true"></span></div></nav>
+</div></header>
+<main class="main" id="content" tabindex="-1">
+<section class="home" id="homeView" aria-labelledby="homeTitle">
+<div class="home-hero">
+<p class="kicker">个人工作台</p>
+<h1 id="homeTitle">把工具放在手边，<br><em>把注意力留给工作。</em></h1>
+<p class="lead">按需载入的自托管工作空间。切换插件时，页面状态会保留。</p>
+<div class="hero-meta"><span class="count" id="pluginCount">正在读取插件</span><span class="meta-note">本地运行，无需构建</span></div>
+</div>
+<div class="load-error" id="loadError" role="alert" hidden><div><strong>无法读取插件清单</strong><p id="loadErrorText"></p></div><button class="button" id="retryPlugins" type="button">重试</button></div>
+<div class="section-heading"><h2>插件</h2><p>选择一个工具开始</p></div>
+<div class="plugin-grid" id="pluginGrid" aria-live="polite" aria-busy="true">
+<div class="skeleton-card" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
+<div class="skeleton-card" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
+<div class="skeleton-card" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
+</div>
+<div class="empty-state" id="homeEmpty" hidden><strong>还没有可用插件</strong><p>服务返回的插件列表为空。添加插件后刷新即可看到。</p></div>
+</section>
+<div class="plugin-views" id="pluginViews" hidden></div>
+</main>
+</div>
+<script src="./app.js" defer></script>
 </body>
 </html>
