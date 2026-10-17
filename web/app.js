@@ -5,7 +5,7 @@
   const $ = (id) => document.getElementById(id);
   const nav = $('navTabs'), grid = $('pluginGrid'), views = $('pluginViews'), home = $('homeView');
   const count = $('pluginCount'), errorBox = $('loadError'), errorText = $('loadErrorText');
-  const toggle = $('navToggle'), toggleLabel = $('navToggleLabel'), navBox = $('pluginNav');
+  const toggle = $('navToggle'), current = $('navCurrent'), navBox = $('pluginNav');
   const S = { plugins: [], byId: new Map(), views: new Map(), loaded: false };
   let collapsed = readCollapsed();
 
@@ -45,19 +45,29 @@
   }
   function supported(plugin) { return plugin.kind === 'iframe' || plugin.kind === 'link'; }
   function ready(plugin) { return plugin.ready === true && supported(plugin) && !!entryOf(plugin.entry); }
+  // 入口同源就在壳内打开：顶栏那一行本来就该跟着插件走，另开一整页会把入口弄丢。
+  // 想整页用右上角「新标签页」或右键新标签打开，链接仍然是插件自己的真实地址。
+  function inShell(plugin) { return plugin.kind === 'iframe' || plugin.kind === 'link'; }
   function nameOf(plugin) { return typeof plugin.name === 'string' && plugin.name.trim() ? plugin.name : plugin.id; }
   function hashOf(id) { return '#' + encodeURIComponent(id); }
 
-  function updateToggleLabel() {
-    if (!collapsed) { toggleLabel.textContent = '收起导航'; return; }
+  // 按钮只有图标（方向由 CSS 旋转），文案留在无障碍属性里；收起后顶栏那一行
+  // 换成「当前在哪个插件」，所以标签条可以整条让位。
+  function updateCollapsedChrome() {
     const plugin = S.activeId ? S.byId.get(S.activeId) : null;
-    toggleLabel.textContent = plugin ? nameOf(plugin) : '展开导航';
+    const label = collapsed ? '展开插件导航' : '收起插件导航';
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
+    current.replaceChildren();
+    if (!collapsed) { current.hidden = true; return; }
+    current.append(icon(plugin ? plugin.icon : 'grid'),
+      el('span', 'nav-current-label', plugin ? nameOf(plugin) : '插件导航'));
+    current.hidden = false;
   }
   function applyCollapsed() {
     document.documentElement.classList.toggle('nav-collapsed', collapsed);
     toggle.setAttribute('aria-expanded', String(!collapsed));
-    updateToggleLabel();
-    toggle.title = collapsed ? '展开插件导航' : '收起插件导航';
+    updateCollapsedChrome();
   }
   function loadingView() {
     errorBox.hidden = true;
@@ -144,11 +154,6 @@
         tab.disabled = true;
         tab.title = name + '：' + (supported(plugin) ? '未就绪' : '类型不支持');
         tab.setAttribute('aria-label', tab.title);
-      } else if (plugin.kind === 'link') {
-        tab.href = entryOf(plugin.entry);
-        tab.target = '_blank';
-        tab.rel = 'noopener noreferrer';
-        tab.title = '在新标签打开 ' + name;
       } else {
         tab.href = entryOf(plugin.entry);
         tab.title = name + '（左键在此打开，右键可新标签页打开）';
@@ -170,11 +175,7 @@
       const card = document.createElement(canUse ? 'a' : 'div');
       card.className = 'plugin-card' + (canUse ? '' : ' is-disabled');
       if (!canUse) card.setAttribute('aria-disabled', 'true');
-      else if (plugin.kind === 'link') {
-        card.href = entryOf(plugin.entry);
-        card.target = '_blank';
-        card.rel = 'noopener noreferrer';
-      } else {
+      else {
         // Real URL so right-click / middle-click can open the plugin directly.
         card.href = entryOf(plugin.entry);
         card.title = name + '（左键在此打开，右键可新标签页打开）';
@@ -191,34 +192,40 @@
       if (!canUse) card.append(el('div', 'plugin-state', supported(plugin) ? '未就绪' : '暂不支持此类型'));
       else {
         const action = el('div', 'plugin-action');
-        action.append(
-          el('span', '', (plugin.kind === 'link' ? '在新标签打开' : '进入插件') + ' →'),
-          el('span', 'plugin-kind', plugin.kind === 'link' ? '外部工具' : '内嵌视图')
-        );
+        action.append(el('span', '', '进入插件 →'), el('span', 'plugin-kind', '内嵌视图'));
         card.append(action);
       }
       grid.append(card);
     });
   }
+  // 窄屏上标签条是横向滚动的，当前插件可能停在可视区外。这里算一次偏移量
+  // 而不是交给 scrollIntoView 的 nearest：进插件的瞬间标签宽度还没稳定，
+  // nearest 会判成「已可见」而不滚。
+  function revealTab(tab) {
+    const box = nav.getBoundingClientRect(), rect = tab.getBoundingClientRect(), edge = 6;
+    if (rect.left < box.left + edge) nav.scrollLeft -= (box.left + edge) - rect.left;
+    else if (rect.right > box.right - edge) nav.scrollLeft += rect.right - (box.right - edge);
+  }
   function markActive(id) {
     S.activeId = id || null;
     nav.querySelectorAll('.nav-tab').forEach((tab) => {
-      if (tab.dataset.pluginId === id) tab.setAttribute('aria-current', 'page');
-      else tab.removeAttribute('aria-current');
+      if (tab.dataset.pluginId !== id) { tab.removeAttribute('aria-current'); return; }
+      tab.setAttribute('aria-current', 'page');
+      requestAnimationFrame(() => requestAnimationFrame(() => revealTab(tab)));
     });
     // The top bar carries a real link for the open plugin, so it can be opened in
     // a new tab from a tablet (long press) as well as by right-click.
     const external = $('openInTab');
     if (external) {
       const plugin = id ? S.byId.get(id) : null;
-      const href = plugin && plugin.kind === 'iframe' ? entryOf(plugin.entry) : null;
+      const href = plugin && inShell(plugin) ? entryOf(plugin.entry) : null;
       external.hidden = !href;
       if (href) {
         external.href = href;
         external.title = '在新标签页打开 ' + nameOf(plugin);
       }
     }
-    updateToggleLabel();
+    updateCollapsedChrome();
   }
   function hideViews() {
     S.views.forEach((view) => { view.section.hidden = true; view.frame.hidden = true; });
@@ -240,6 +247,8 @@
     frame.title = nameOf(plugin);
     frame.src = entryOf(plugin.entry);
     frame.referrerPolicy = 'same-origin';
+    // 编辑器要在内嵌视图里能用剪贴板
+    frame.setAttribute('allow', 'clipboard-read; clipboard-write');
     frame.hidden = true;
     section.append(frame);
     views.append(section);
@@ -269,7 +278,7 @@
       return;
     }
     const plugin = S.byId.get(raw);
-    if (!plugin || !ready(plugin) || plugin.kind !== 'iframe') {
+    if (!plugin || !ready(plugin) || !inShell(plugin)) {
       history.replaceState(null, '', '#home');
       showHome();
       return;
@@ -296,6 +305,11 @@
   });
   $('retryPlugins').addEventListener('click', loadPlugins);
   window.addEventListener('hashchange', route);
+  // 转屏/改窗口宽度后当前标签可能又被挤出可视区
+  window.addEventListener('resize', () => {
+    const active = nav.querySelector('.nav-tab[aria-current]');
+    if (active) revealTab(active);
+  });
   applyCollapsed();
   loadPlugins();
 })();

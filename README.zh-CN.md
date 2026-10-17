@@ -11,7 +11,7 @@
 |---|---|---|
 | `agents` | 完整的 DSH 对话工作区，可接入 Codex 与 Claude Code | `node` + 一个 DeepSeek API key |
 | `zotero` | 浏览 Zotero 书库、读 PDF、划词翻译 | Zotero 桌面端 |
-| `vscode` | 在新标签页打开 VS Code Web | VS Code CLI（`code`） |
+| `vscode` | 在壳内用 VS Code Web 写代码，顶栏导航一直可用 | VS Code CLI（`code`） |
 
 第四个插件就是一个放两个文件的文件夹。宿主从不按名字 import 插件、也不看插件内部，
 所以加一个工具不需要改宿主。
@@ -187,7 +187,7 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
 ## 开发
 
 ```bash
-python -m pytest          # 34 个测试：安全闸门、路由、缓存策略、插件、端到端起服务
+python -m pytest          # 35 个测试：安全闸门、路由、缓存策略、插件、端到端起服务
 ```
 
 目录：

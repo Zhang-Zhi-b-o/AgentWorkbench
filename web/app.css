@@ -75,14 +75,17 @@ button,a{-webkit-tap-highlight-color:transparent}
 .brand{flex:none;display:flex;align-items:center;gap:8px;min-height:38px;color:var(--text)}
 .brand img{width:26px;height:26px}
 .brand b{font-size:15px;font-weight:650;letter-spacing:-.01em}
-.nav-toggle{display:flex;align-items:center;gap:5px;min-height:32px;padding:0 9px;border:1px solid transparent;border-radius:var(--radius-sm);background:none;color:var(--muted);font-size:12px;cursor:pointer}
-.nav-toggle:hover{background:var(--soft);border-color:var(--line)}
-.nav-toggle svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.nav-toggle{display:flex;flex:none;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid transparent;border-radius:var(--radius-sm);background:none;color:var(--muted);cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+.nav-toggle:hover{background:var(--soft-2);border-color:var(--line);color:var(--text)}
+.nav-toggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .16s}
 .nav-toggle[aria-expanded="false"]{color:var(--text);background:var(--soft);border-color:var(--line)}
+.nav-toggle[aria-expanded="false"] svg{transform:rotate(180deg)}
 
 /* -- 插件导航 ------------------------------------------------------ */
-.plugin-nav{flex:1 1 0;min-width:0}
-.nav-tabs{display:flex;gap:4px;overflow-x:auto;padding:1px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* 标签条是唯一可伸缩区：宽度不够时它自己左右滚动，品牌、收起按钮、
+   新标签页链接都固定不动，所以窄屏也不会把某个插件挤到看不见。 */
+.plugin-nav{flex:1 1 0;display:flex;align-items:center;min-width:0;overflow:hidden}
+.nav-tabs{display:flex;flex:1 1 auto;gap:4px;overflow-x:auto;padding:1px;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 .nav-tabs::-webkit-scrollbar{display:none}
 .nav-tab{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:32px;padding:0 11px;border:1px solid transparent;border-radius:var(--radius-sm);background:none;color:var(--muted);font-size:13px;font-weight:550;cursor:pointer;transition:background .12s,color .12s}
 .nav-tab:hover{background:var(--soft-2);color:var(--text)}
@@ -93,10 +96,11 @@ button,a{-webkit-tap-highlight-color:transparent}
 .nav-skeleton{flex:none;width:84px;height:32px;border-radius:var(--radius-sm);background:var(--soft-2)}
 .nav-skeleton.short{width:64px}
 .nav-error{padding:8px 2px;color:var(--danger);font-size:12.5px}
-.nav-collapsed .nav-label{display:none}
-.nav-collapsed .plugin-nav{display:none}
-.nav-collapsed .nav-tab{width:36px;padding:0;justify-content:center}
-.nav-collapsed .nav-skeleton{width:36px}
+/* 收起导航后这一行只留「当前在哪个插件」，标签条整条让位 */
+.nav-current{display:flex;align-items:center;gap:6px;min-width:0;padding:0 2px;color:var(--text);font-size:13px;font-weight:600}
+.nav-current svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav-current-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-collapsed .nav-tabs{display:none}
 /* 打开当前插件真实地址的链接：可目标页打开，也支持右键/长按新标签页 */
 .tab-external{display:inline-flex;align-items:center;min-height:32px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--soft);color:var(--muted);font-size:12px;font-weight:550;white-space:nowrap}
 .tab-external:hover{background:var(--soft-2);color:var(--text)}
@@ -105,9 +109,6 @@ button,a{-webkit-tap-highlight-color:transparent}
 .main{display:flex;flex:1;flex-direction:column;min-height:0}
 .home{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:clamp(18px,3.2vw,30px) max(18px,env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left))}
 .home>*{width:100%;max-width:1080px;margin-inline:auto}
-.kicker{margin:0 0 6px;color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
-.home h1{max-width:640px;margin:0;font-size:clamp(19px,2.4vw,25px);line-height:1.36;letter-spacing:-.012em;font-weight:650}
-.home h1 em{font-style:normal;color:inherit}
 .lead{max-width:560px;margin:7px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
 .hero-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:10px;color:var(--faint);font-size:12px}
 .count{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-weight:600}
@@ -146,13 +147,17 @@ a.plugin-card:hover{border-color:var(--line-strong);background:var(--soft)}
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
 
-/* 手机上把导航压成图标条：三个插件标签必须同时可见，否则看上去像"插件不见了" */
+/* 手机上顶栏放不下三个插件：标签保留文字、整条左右滑动；
+   收起按钮和新标签页链接压成图标，保证任何宽度下都点得到 */
 @media(max-width:560px){
-  .nav-label{display:none}
-  .nav-tab{width:36px;padding:0;justify-content:center}
-  #navToggleLabel{display:none}
-  .nav-toggle{padding:0 9px}
+  .topbar-inner{gap:4px}
+  .nav-tabs{gap:2px;padding:1px 2px}
+  .nav-tab{padding:0 9px;font-size:12.5px}
   .tab-external{font-size:0;padding:0 9px}
   .tab-external::before{content:"↗";font-size:13px;font-weight:700}
   .home .lead{font-size:12.5px}
+}
+@media(max-width:400px){
+  .brand b{display:none}
+  .brand img{width:24px;height:24px}
 }

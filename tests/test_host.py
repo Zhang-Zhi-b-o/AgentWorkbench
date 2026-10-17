@@ -58,9 +58,9 @@ class CachePolicyTest(unittest.TestCase):
         self.assertIn("immutable", cache_policy("index-D1ERvYDZ.js"))
         self.assertIn("immutable", cache_policy("vendor-react-vfD4mCvE.css"))
 
-    def test_unhashed_assets_get_a_short_ttl(self):
-        self.assertEqual(cache_policy("app.js"), "public, max-age=300")
-        self.assertEqual(cache_policy("reader.js"), "public, max-age=300")
+    def test_unhashed_assets_revalidate(self):
+        self.assertEqual(cache_policy("app.js"), "no-cache")
+        self.assertEqual(cache_policy("reader.js"), "no-cache")
 
 
 class StaticPathTest(unittest.TestCase):

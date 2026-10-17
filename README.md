@@ -12,7 +12,7 @@ Three plugins ship with it:
 |---|---|---|
 | `agents` | The full DSH chat workspace, with Codex and Claude Code available as agents | `node` + a DeepSeek API key |
 | `zotero` | Browse your Zotero library, read PDFs, translate a selection | the Zotero desktop app |
-| `vscode` | Open VS Code Web in a new tab | the VS Code CLI (`code`) |
+| `vscode` | Edit code in VS Code Web, inside the shell (top-bar links stay available) | the VS Code CLI (`code`) |
 
 A fourth plugin is a folder with two files. The host never imports a plugin by
 name and never inspects its internals, so adding a tool does not mean editing the
@@ -205,7 +205,7 @@ and the host formats it for the browser.
 ## Development
 
 ```bash
-python -m pytest          # 34 tests: guards, routing, cache policy, plugins, end to end
+python -m pytest          # 35 tests: guards, routing, cache policy, plugins, end to end
 ```
 
 Layout:
