@@ -15,7 +15,7 @@
 <div class="zotero-app">
 <header class="zp-header">
 <div class="zp-id"><img src="../../favicon.svg" width="30" height="30" alt=""><h1>Zotero 阅读</h1></div>
-<div class="zp-actions"><span class="service" id="servicePill" data-state="loading" role="status"><i></i><span id="serviceText">连接中</span></span><button class="button back" id="backBtn" type="button" hidden>返回列表</button></div>
+<div class="zp-actions"><button class="button back" id="backBtn" type="button" hidden>返回列表</button></div>
 </header>
 <main class="zp-main">
 <section class="view library" id="libraryView" aria-label="资料库">
@@ -32,7 +32,7 @@
 <input id="searchInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" spellcheck="false" placeholder="搜索标题、作者或摘要">
 <button class="clear" id="clearSearch" type="button" aria-label="清除搜索" hidden>清除</button>
 </div>
-<div class="summary"><p id="listSummary" aria-live="polite">正在读取条目…</p><span id="activeCollection">全部条目</span></div>
+<div class="summary"><p id="listSummary" aria-live="polite">正在读取条目…</p></div>
 <div class="alert" id="listError" role="alert" hidden><div><b>服务不可用</b><p id="listErrorText"></p></div><button class="button small" id="retryList" type="button">重试</button></div>
 <div class="skeleton" id="listSkeleton" aria-hidden="true"></div>
 <div class="item-list" id="itemList" aria-label="条目列表"></div>
@@ -71,7 +71,6 @@
 </section>
 
 <section class="view reader" id="readerView" hidden aria-label="PDF 阅读器">
-<div class="reader-status" id="readerStatus"><span class="spinner"></span><span id="readerStatusText">正在载入阅读器…</span></div>
 <div class="reader-host" id="readerHost"></div>
 </section>
 </main>

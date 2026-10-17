@@ -1,5 +1,7 @@
 # AgentWorkbench
 
+**English** · [简体中文](README.zh-CN.md)
+
 A small, self-hosted workbench for reaching your own computer from anywhere: a
 plugin host with one page per tool, designed for a private network (Tailscale)
 and a slow, high-latency link.
@@ -196,7 +198,7 @@ and the host formats it for the browser.
 ## Development
 
 ```bash
-python -m pytest          # 33 tests: guards, routing, cache policy, plugins, end to end
+python -m pytest          # 34 tests: guards, routing, cache policy, plugins, end to end
 ```
 
 Layout:

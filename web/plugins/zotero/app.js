@@ -4,9 +4,8 @@
   const $ = (id) => document.getElementById(id);
   const PAGE = 25, LIMIT = 6000, READER = '/zotero-reader/reader.html';
   const L = $('libraryView'), DV = $('detailView'), RV = $('readerView'), BB = $('backBtn');
-  const SP = $('servicePill'), ST = $('serviceText');
   const CL = $('collectionList'), CE = $('collectionError'), CET = $('collectionErrorText'), RC = $('retryCollections');
-  const SI = $('searchInput'), CS = $('clearSearch'), LS = $('listSummary'), AC = $('activeCollection');
+  const SI = $('searchInput'), CS = $('clearSearch'), LS = $('listSummary');
   const LE = $('listError'), LET = $('listErrorText'), RL = $('retryList'), LK = $('listSkeleton');
   const IL = $('itemList'), ES = $('emptyState'), ET = $('emptyTitle'), EX = $('emptyText');
   const LW = $('loadMoreWrap'), LM = $('loadMore');
@@ -19,7 +18,7 @@
   const TE = $('translationError'), TET = $('translationErrorText'), RT = $('retryTranslation');
   const TO = $('translationOutput'), TM = $('translationModel'), CB = $('cacheBadge');
   const TX = $('translationText'), TT = $('toggleTranslation');
-  const RH = $('readerHost'), RS = $('readerStatus'), RST = $('readerStatusText');
+  const RH = $('readerHost');
 
   let view = 'library', colls = [], coll = '', q = '', items = [], total = 0, next = 0;
   let seq = 0, labort = null, loading = false, scroll = 0, retryMode = 'reset', searchTimer = 0;
@@ -48,10 +47,6 @@
     if (error instanceof APIError) return error.message;
     if (error && error.name === 'TypeError') return '网络连接失败，请检查网络后重试。';
     return error && error.message || '请求失败，请稍后重试。';
-  }
-  function setService(state, label) {
-    SP.dataset.state = state;
-    ST.textContent = label;
   }
   function setView(name) {
     view = name;
@@ -94,10 +89,6 @@
   }
 
   /* 分类与条目列表 */
-  function updateActive() {
-    const item = colls.find((entry) => entry.key === coll);
-    AC.textContent = item ? str(item.name) || item.key : '全部条目';
-  }
   function drawCollections() {
     const frag = document.createDocumentFragment();
     const all = mk('button', 'button', '全部条目');
@@ -114,7 +105,6 @@
       frag.append(button);
     });
     CL.replaceChildren(frag);
-    updateActive();
   }
   async function loadCollections() {
     if (cabort) cabort.abort();
@@ -179,7 +169,6 @@
     const controller = new AbortController();
     labort = controller;
     loading = true;
-    if (reset && SP.dataset.state !== 'online') setService('loading', '连接中');
     LE.hidden = true;
     ES.hidden = true;
     LW.hidden = true;
@@ -217,7 +206,6 @@
       IL.setAttribute('aria-busy', 'false');
       LW.hidden = !(page.length > 0 && next < total);
       if (!items.length) showEmpty();
-      setService('online', '已连接');
       retryMode = reset ? 'reset' : 'append';
     } catch (error) {
       if (error.name === 'AbortError' || current !== seq) return;
@@ -234,7 +222,6 @@
         ES.hidden = true;
       }
       retryMode = reset ? 'reset' : 'append';
-      setService('error', '服务不可用');
     } finally {
       if (current === seq) {
         loading = false;
@@ -312,14 +299,12 @@
       }));
       if (current !== dseq) return;
       drawDetail(data);
-      setService('online', '已连接');
     } catch (error) {
       if (error.name === 'AbortError' || current !== dseq) return;
       DS.hidden = true;
       DC.hidden = true;
       DE.hidden = false;
       DET.textContent = friendly(error);
-      setService('error', '服务不可用');
     } finally {
       if (dabort === controller) dabort = null;
     }
@@ -468,29 +453,13 @@
     frame.className = 'reader-frame';
     frame.title = 'PDF 阅读器';
     frame.src = READER;
-    frame.hidden = true;
-    frame.addEventListener('load', () => {
-      readerReady = true;
-      frame.hidden = false;
-      RS.hidden = true;
-    });
-    frame.addEventListener('error', () => {
-      const spinner = RS.querySelector('.spinner');
-      if (spinner) spinner.hidden = true;
-      RST.textContent = '阅读器载入失败，请返回详情重试。';
-    });
+    frame.addEventListener('load', () => { readerReady = true; });
     RH.append(frame);
   }
   function openReader() {
     setView('reader');
     if (!frame) mountReader();
-    if (readerReady) {
-      RS.hidden = true;
-      frame.hidden = false;
-    } else {
-      RS.hidden = false;
-      frame.hidden = true;
-    }
+    frame.hidden = !readerReady;
     focus(BB);
   }
   function closeReader() {
@@ -514,7 +483,6 @@
     CL.querySelectorAll('button[data-k]').forEach((item) => {
       item.setAttribute('aria-pressed', String((item.dataset.k || '') === coll));
     });
-    updateActive();
     clearTimeout(searchTimer);
     loadItems(true);
   });
@@ -577,16 +545,9 @@
     texp = !texp;
     renderTranslation();
   });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && view === 'reader') {
-      event.preventDefault();
-      closeReader();
-    }
-  });
 
   DT.setAttribute('tabindex', '-1');
   setView('library');
-  setService('loading', '连接中');
   loadCollections();
   loadConfig();
   loadItems(true);

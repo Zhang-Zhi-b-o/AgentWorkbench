@@ -60,18 +60,7 @@
     grid.hidden = false;
     grid.setAttribute('aria-busy', 'true');
     navBox.setAttribute('aria-busy', 'true');
-    nav.replaceChildren();
-    for (let i = 0; i < 3; i += 1) {
-      const stub = el('span', i === 2 ? 'nav-skeleton short' : 'nav-skeleton');
-      stub.setAttribute('aria-hidden', 'true');
-      nav.append(stub);
-    }
-    grid.replaceChildren();
-    for (let i = 0; i < 3; i += 1) {
-      const card = el('div', 'skeleton-card');
-      card.setAttribute('aria-hidden', 'true');
-      grid.append(card);
-    }
+    nav.replaceChildren(el('span', 'nav-error', '正在读取插件'));
     home.hidden = false;
     views.hidden = true;
     document.title = '工作台';
