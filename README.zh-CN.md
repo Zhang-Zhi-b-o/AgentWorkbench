@@ -107,6 +107,12 @@
 - **独立打开**：直接访问 `/vscode/` 也可以，页面顶部仍带工作台的插件导航；没带文件夹
   参数时会跳到插件配置里的 `folder`（`plugins.json`），否则原生 serve-web 只会给一个
   空的欢迎窗口，没有文件可编辑。
+- **导入桌面扩展**：服务器有自己的一套扩展，`import-vscode-extensions.ps1` 会把
+  `%USERPROFILE%\.vscode\extensions` 同步到 `data/vscode-server/extensions`，再由服务器
+  自己重扫。脚本不复制桌面那份 `extensions.json`（它的条目指向桌面目录），也不复制
+  `.obsolete` 里列出的旧版本。因为扩展宿主就在本机以 Node 运行，带原生二进制的扩展也能用
+  —— 它们是 Windows 构建，所以这是 Windows 到 Windows 的导入。加 `-Restart` 可在导入后
+  顺带重启工作台。
 
 ---
 

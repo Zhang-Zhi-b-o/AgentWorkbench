@@ -139,6 +139,14 @@ redirected**.
   bar kept on top. The bare URL redirects to the plugin's `folder` setting
   (`plugins.json`), because stock serve-web answers it with the empty welcome
   window, i.e. nothing to edit.
+- **Your desktop extensions.** The server keeps its own extension set, so
+  `import-vscode-extensions.ps1` mirrors `%USERPROFILE%\.vscode\extensions` into
+  `data/vscode-server/extensions` and lets the server rescan. It skips the
+  desktop's `extensions.json` (whose entries point at the desktop folder) and the
+  versions listed in `.obsolete`. Because the extension host runs in Node on the
+  same machine, extensions with native binaries work — they are Windows builds,
+  so this is a Windows-to-Windows import. Pass `-Restart` to restart the
+  workbench afterwards.
 
 ---
 
