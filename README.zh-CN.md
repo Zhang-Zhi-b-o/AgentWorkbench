@@ -2,8 +2,6 @@
 
 [English](README.md) · **简体中文**
 
-[![tests](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml)
-
 一个自托管的随身工作台：把「远程用自己那台电脑」变成打开一个网页。宿主只做插件目录与
 转发，每个工具一个独立插件。为**私有网络（Tailscale）**和**慢速、高延迟链路**而设计。
 
@@ -231,8 +229,9 @@ tailscale serve --bg --https=8770 http://127.0.0.1:3080
 python -m pytest          # 40 个测试：安全闸门、路由、缓存策略、插件、端到端起服务
 ```
 
-每次 push 都会在 Windows 和 Linux 上跑同一套测试
-（[workflow](.github/workflows/tests.yml)）。
+同一套测试在 Windows 和 Linux、Python 3.10 与 3.12 上跑
+（[workflow](.github/workflows/tests.yml)）；因为该 workflow 目前是手动触发，push 前
+请本地跑一遍。
 
 目录：
 

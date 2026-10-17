@@ -1,9 +1,17 @@
 name: tests
 
+# Run this by hand from the Actions tab (Run workflow) until the account's
+# Actions billing is sorted out; every push currently costs a red X without
+# running a single test.  To get it back on push -- and a badge in the README --
+# restore the triggers below and add this line near the top of README.md:
+#
+#   [![tests](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml)
+#
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 jobs:

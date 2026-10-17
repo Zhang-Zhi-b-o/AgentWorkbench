@@ -2,8 +2,6 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-[![tests](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Zhang-Zhi-b-o/AgentWorkbench/actions/workflows/tests.yml)
-
 A small, self-hosted workbench for reaching your own computer from anywhere: a
 plugin host with one page per tool, designed for a private network (Tailscale)
 and a slow, high-latency link.
@@ -256,8 +254,9 @@ and the host formats it for the browser.
 python -m pytest          # 40 tests: guards, routing, cache policy, plugins, end to end
 ```
 
-CI runs the same suite on Windows and Linux for every push
-([workflow](.github/workflows/tests.yml)).
+CI runs the same suite on Windows and Linux for Python 3.10 and 3.12
+([workflow](.github/workflows/tests.yml)); run it locally before pushing, since
+the workflow is currently manual-triggered.
 
 Layout:
 
