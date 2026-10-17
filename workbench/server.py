@@ -32,13 +32,19 @@ _HASHED_ASSET = re.compile(
 
 
 def cache_policy(name: str) -> str:
-    """Long cache for hashed assets, no cache for HTML, short for the rest."""
+    """Long cache for hashed assets; revalidate everything else.
+
+    An unhashed stylesheet that changes while a phone holds a five-minute copy is
+    exactly the bug where "I fixed it but the device still shows the old look".
+    A 304 costs a couple of hundred bytes, so the bandwidth argument does not
+    apply to these few files.
+    """
     lowered = name.lower()
     if lowered.endswith(".html"):
         return "no-store"
     if _HASHED_ASSET.search(name):
         return "public, max-age=31536000, immutable"
-    return "public, max-age=300"
+    return "no-cache"
 
 
 def safe_static_path(root: Path, path: str) -> Path | None:

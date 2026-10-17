@@ -7,6 +7,8 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from workbench import config
 from workbench.errors import WorkbenchError
@@ -162,6 +164,35 @@ class AgentsAndVscodeTest(unittest.TestCase):
         for plugin_id in ("agents", "vscode"):
             plugin = self.registry.by_id(plugin_id)
             self.assertFalse(plugin.handle(FakeRequest("GET", "/api/other")))
+
+    def test_first_agents_visit_starts_dsh_and_returns_handoff(self):
+        """首次打开 AI 页必须走完整 argv 构造，不能仅验证状态接口。"""
+        from plugins import agents
+
+        process = Mock()
+        process.poll.return_value = None
+        state = {"process": None, "ready": False, "error": "", "started": 0.0,
+                 "launch_url": ""}
+
+        def announce():
+            state["launch_url"] = "http://127.0.0.1:3080/?token=test-bootstrap"
+
+        request = FakeRequest("GET", "/agents/")
+        with patch.object(agents, "_state", state), \
+                patch.object(agents, "available", return_value=True), \
+                patch.object(agents, "_child_env", return_value={}), \
+                patch.object(agents, "_assert_port_free"), \
+                patch.object(agents, "ProcessTree"), \
+                patch.object(agents, "_http_ready", return_value=True), \
+                patch.object(agents.threading, "Thread", return_value=SimpleNamespace(start=announce)), \
+                patch.object(agents.subprocess, "Popen", return_value=process) as launch:
+            self.assertTrue(agents.handle(request))
+        argv = launch.call_args.args[0]
+        self.assertTrue(Path(argv[0]).is_absolute())
+        self.assertEqual(argv[1], str(agents.BINARY.resolve()))
+        self.assertIn("--no-open", argv)
+        self.assertEqual(request.sent[0][0], "redirect")
+        self.assertTrue(state["ready"])
 
     def test_ensure_returns_when_its_port_is_taken(self):
         """Regression: ensure() reported through status() while holding the lock.

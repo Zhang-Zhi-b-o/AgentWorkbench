@@ -4,11 +4,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f3f0e8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#101613" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151517" media="(prefers-color-scheme: dark)">
 <title>工作台</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="./app.css">
+<link rel="stylesheet" href="./app.css?v=5">
 </head>
 <body>
 <a class="skip-link" href="#content">跳到主要内容</a>
@@ -17,6 +17,7 @@
 <a class="brand" href="#home" aria-label="工作台首页"><img class="brand-mark" src="./favicon.svg" width="34" height="34" alt=""><b>工作台</b></a>
 <button class="nav-toggle" id="navToggle" type="button" aria-expanded="true" aria-controls="pluginNav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M5 16h9"/></svg><span id="navToggleLabel">收起导航</span></button>
 <nav class="plugin-nav" id="pluginNav" aria-label="插件导航" aria-busy="true"><div class="nav-tabs" id="navTabs"><span class="nav-skeleton" aria-hidden="true"></span><span class="nav-skeleton" aria-hidden="true"></span><span class="nav-skeleton short" aria-hidden="true"></span></div></nav>
+<a class="tab-external" id="openInTab" href="#" target="_blank" rel="noopener noreferrer" hidden>新标签页 ↗</a>
 </div></header>
 <main class="main" id="content" tabindex="-1">
 <section class="home" id="homeView" aria-labelledby="homeTitle">
@@ -36,6 +37,6 @@
 <div class="plugin-views" id="pluginViews" hidden></div>
 </main>
 </div>
-<script src="./app.js" defer></script>
+<script src="./app.js?v=5" defer></script>
 </body>
 </html>

@@ -48,10 +48,15 @@
   function nameOf(plugin) { return typeof plugin.name === 'string' && plugin.name.trim() ? plugin.name : plugin.id; }
   function hashOf(id) { return '#' + encodeURIComponent(id); }
 
+  function updateToggleLabel() {
+    if (!collapsed) { toggleLabel.textContent = '收起导航'; return; }
+    const plugin = S.activeId ? S.byId.get(S.activeId) : null;
+    toggleLabel.textContent = plugin ? nameOf(plugin) : '展开导航';
+  }
   function applyCollapsed() {
     document.documentElement.classList.toggle('nav-collapsed', collapsed);
     toggle.setAttribute('aria-expanded', String(!collapsed));
-    toggleLabel.textContent = collapsed ? '展开导航' : '收起导航';
+    updateToggleLabel();
     toggle.title = collapsed ? '展开插件导航' : '收起插件导航';
   }
   function loadingView() {
@@ -114,6 +119,18 @@
     views.hidden = true;
     document.title = '工作台';
   }
+  // A plugin link carries the plugin's own URL, so the browser's context menu can
+  // open it in a new tab (and middle/ctrl-click works).  A plain left click is
+  // intercepted and routed inside the shell instead.
+  function embedOnPlainClick(anchor, pluginId) {
+    anchor.addEventListener('click', (event) => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey
+          || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      if (location.hash === hashOf(pluginId)) route();
+      else location.hash = hashOf(pluginId);
+    });
+  }
   function renderNav() {
     nav.replaceChildren();
     S.plugins.forEach((plugin) => {
@@ -133,7 +150,9 @@
         tab.rel = 'noopener noreferrer';
         tab.title = '在新标签打开 ' + name;
       } else {
-        tab.href = hashOf(plugin.id);
+        tab.href = entryOf(plugin.entry);
+        tab.title = name + '（左键在此打开，右键可新标签页打开）';
+        embedOnPlainClick(tab, plugin.id);
       }
       nav.append(tab);
     });
@@ -155,7 +174,12 @@
         card.href = entryOf(plugin.entry);
         card.target = '_blank';
         card.rel = 'noopener noreferrer';
-      } else card.href = hashOf(plugin.id);
+      } else {
+        // Real URL so right-click / middle-click can open the plugin directly.
+        card.href = entryOf(plugin.entry);
+        card.title = name + '（左键在此打开，右键可新标签页打开）';
+        embedOnPlainClick(card, plugin.id);
+      }
       const top = el('div', 'plugin-card-top');
       const badge = el('span', 'plugin-icon');
       badge.append(icon(plugin.icon));
@@ -177,10 +201,24 @@
     });
   }
   function markActive(id) {
+    S.activeId = id || null;
     nav.querySelectorAll('.nav-tab').forEach((tab) => {
       if (tab.dataset.pluginId === id) tab.setAttribute('aria-current', 'page');
       else tab.removeAttribute('aria-current');
     });
+    // The top bar carries a real link for the open plugin, so it can be opened in
+    // a new tab from a tablet (long press) as well as by right-click.
+    const external = $('openInTab');
+    if (external) {
+      const plugin = id ? S.byId.get(id) : null;
+      const href = plugin && plugin.kind === 'iframe' ? entryOf(plugin.entry) : null;
+      external.hidden = !href;
+      if (href) {
+        external.href = href;
+        external.title = '在新标签页打开 ' + nameOf(plugin);
+      }
+    }
+    updateToggleLabel();
   }
   function hideViews() {
     S.views.forEach((view) => { view.section.hidden = true; view.frame.hidden = true; });
