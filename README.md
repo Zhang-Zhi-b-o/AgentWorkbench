@@ -74,6 +74,9 @@ AgentWorkbench listening on http://127.0.0.1:8768
 Nothing else is required: a plugin whose dependency is missing simply reports
 `not available` and its card is disabled, while the rest keep working.
 
+On Windows, `start.ps1` does the same thing from a shortcut: it reuses a healthy
+running instance, starts one in the background if needed, then opens the browser.
+
 ## Configuration
 
 Everything machine-specific lives in the data directory, never in git.
