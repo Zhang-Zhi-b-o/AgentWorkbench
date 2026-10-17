@@ -187,6 +187,14 @@ class WorkbenchServer(ThreadingHTTPServer):
 
 
 def main(argv=None) -> int:
+    # The checkout is the delivery unit: ``web/`` and ``plugins/`` are read from
+    # beside this package, so a wheel installed into site-packages would serve no
+    # pages and find no plugins.  Say so instead of starting a blank host.
+    if not (config.WEB_DIR / "index.html").is_file():
+        print("workbench: %s has no web/index.html" % config.WEB_DIR, file=sys.stderr)
+        print("workbench: run it from the checkout, or install it there with "
+              "pip install -e .", file=sys.stderr)
+        return 2
     registry = plugin.load(config.PLUGIN_DIR)
     server = WorkbenchServer((config.HOST, config.PORT), registry)
     registry.start()
@@ -194,8 +202,12 @@ def main(argv=None) -> int:
     print("  data      %s" % config.HOME)
     print("  plugins   %d from %s" % (len(registry.plugins), config.PLUGIN_DIR))
     for item in registry.plugins:
-        note = item.error or ("ready" if item.ready() else "not available")
+        note = item.error or ("ready" if item.ready()
+                              else (item.reason() or "not available"))
         print("  %-9s %-8s %-18s %s" % (item.id, item.kind, item.entry, note))
+    # Launched from start.ps1 the banner goes to a log file; without this it
+    # would sit in the block buffer for the whole life of the process.
+    sys.stdout.flush()
     if not registry.plugins:
         print("workbench: no plugins found; the shell will show an empty list",
               file=sys.stderr)

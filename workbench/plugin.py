@@ -44,9 +44,26 @@ class Plugin:
         payload = {
             "id": self.id, "name": self.name, "description": self.description,
             "icon": self.icon, "kind": self.kind, "entry": self.entry,
-            "ready": self.ready(), "error": self.error,
+            "ready": self.ready(), "error": self.error, "reason": self.reason(),
         }
         return payload
+
+    def reason(self) -> str:
+        """Why a working plugin is unavailable, in words a user can act on.
+
+        ``error`` is reserved for a broken manifest or a failed import; this is
+        the normal, expected case of a missing dependency, so the two never mix.
+        A plugin opts in by defining ``reason()`` in its module.
+        """
+        if self.error or self.ready():
+            return ""
+        hook = getattr(self.module, "reason", None) if self.module else None
+        if hook is None:
+            return ""
+        try:
+            return str(hook() or "")
+        except Exception:
+            return ""
 
     def ready(self) -> bool:
         """Cheap availability probe; must not start anything."""

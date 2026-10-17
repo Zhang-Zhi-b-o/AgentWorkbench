@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from workbench import config, security
 from workbench.plugin import Plugin, Registry, load
@@ -101,7 +102,7 @@ class RegistryTest(unittest.TestCase):
     def test_manifest_never_contains_a_secret(self):
         payload = self._plugin("a", ["/api"]).manifest()
         self.assertEqual(set(payload), {"id", "name", "description", "icon", "kind",
-                                        "entry", "ready", "error"})
+                                        "entry", "ready", "error", "reason"})
 
     def test_real_plugins_load(self):
         registry = load(config.PLUGIN_DIR)
@@ -113,6 +114,43 @@ class RegistryTest(unittest.TestCase):
     def test_registry_serialises_to_json(self):
         payload = load(config.PLUGIN_DIR).manifests()
         self.assertEqual(json.loads(json.dumps(payload))["plugins"][0]["kind"], "iframe")
+
+
+class UnavailableReasonTest(unittest.TestCase):
+    """A disabled plugin has to explain itself without becoming an error."""
+
+    def _plugin(self, module, error=""):
+        return Plugin(id="a", name="a", description="", icon="box", kind="iframe",
+                      entry="/a/", routes=("/a",), module=module, error=error)
+
+    def test_the_reason_reaches_the_manifest(self):
+        module = SimpleNamespace(available=lambda: False,
+                                 reason=lambda: "install the runtime")
+        payload = self._plugin(module).manifest()
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["reason"], "install the runtime")
+        self.assertEqual(payload["error"], "")
+
+    def test_a_ready_plugin_reports_no_reason(self):
+        module = SimpleNamespace(available=lambda: True,
+                                 reason=lambda: "must not be shown")
+        self.assertEqual(self._plugin(module).manifest()["reason"], "")
+
+    def test_a_broken_manifest_keeps_using_error(self):
+        module = SimpleNamespace(available=lambda: False, reason=lambda: "ignored")
+        payload = self._plugin(module, error="import failed: ValueError").manifest()
+        self.assertEqual(payload["error"], "import failed: ValueError")
+        self.assertEqual(payload["reason"], "")
+
+    def test_a_plugin_without_a_hook_simply_has_no_reason(self):
+        module = SimpleNamespace(available=lambda: False)
+        self.assertEqual(self._plugin(module).manifest()["reason"], "")
+
+    def test_a_raising_hook_does_not_break_the_manifest(self):
+        def boom():
+            raise RuntimeError("broken probe")
+        module = SimpleNamespace(available=lambda: False, reason=boom)
+        self.assertEqual(self._plugin(module).manifest()["reason"], "")
 
 
 if __name__ == "__main__":

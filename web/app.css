@@ -147,6 +147,8 @@ a.plugin-card:hover{border-color:var(--line-strong);background:var(--soft)}
 .plugin-action{color:var(--text);font-weight:600}
 .plugin-kind{margin-left:auto;color:var(--faint);font-weight:500}
 .plugin-state{color:var(--faint)}
+/* 未就绪卡片必须说清缺什么，否则「没装可选依赖」和「装坏了」在界面上长得一样。 */
+.plugin-hint{margin:7px 0 0;color:var(--faint);font-size:11.5px;line-height:1.6;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .skeleton-card{min-height:168px;border:1px solid var(--line);border-radius:var(--radius);background:var(--soft)}
 .empty-state{margin-top:12px;padding:36px 18px;text-align:center;border:1px dashed var(--line-strong);border-radius:var(--radius)}
 .empty-state b{font-size:14px}

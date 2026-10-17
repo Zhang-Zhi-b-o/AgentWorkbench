@@ -49,6 +49,7 @@
   // 想整页用右上角「新标签页」或右键新标签打开，链接仍然是插件自己的真实地址。
   function inShell(plugin) { return plugin.kind === 'iframe' || plugin.kind === 'link'; }
   function nameOf(plugin) { return typeof plugin.name === 'string' && plugin.name.trim() ? plugin.name : plugin.id; }
+  function reasonOf(plugin) { return typeof plugin.reason === 'string' ? plugin.reason.trim() : ''; }
   function hashOf(id) { return '#' + encodeURIComponent(id); }
 
   // 按钮只有图标（方向由 CSS 旋转），文案留在无障碍属性里；收起后整条顶栏
@@ -146,7 +147,8 @@
       if (!usable) {
         tab.type = 'button';
         tab.disabled = true;
-        tab.title = name + '：' + (supported(plugin) ? '未就绪' : '类型不支持');
+        tab.title = name + '：' + (supported(plugin)
+          ? (reasonOf(plugin) || '未就绪') : '类型不支持');
         tab.setAttribute('aria-label', tab.title);
       } else {
         tab.href = entryOf(plugin.entry);
@@ -183,8 +185,13 @@
       const description = typeof plugin.description === 'string' && plugin.description.trim()
         ? plugin.description : '这个插件还没有填写描述。';
       card.append(el('p', 'plugin-desc', description));
-      if (!canUse) card.append(el('div', 'plugin-state', supported(plugin) ? '未就绪' : '暂不支持此类型'));
-      else {
+      if (!canUse) {
+        card.append(el('div', 'plugin-state', supported(plugin) ? '未就绪' : '暂不支持此类型'));
+        // A disabled card has to say what is missing, otherwise a clone with no
+        // optional dependencies looks identical to a broken installation.
+        const why = reasonOf(plugin);
+        if (why) card.append(el('p', 'plugin-hint', why));
+      } else {
         const action = el('div', 'plugin-action');
         action.append(el('span', '', '进入插件 →'), el('span', 'plugin-kind', '内嵌视图'));
         card.append(action);

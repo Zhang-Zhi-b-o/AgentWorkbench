@@ -25,7 +25,10 @@ from workbench import config
 from workbench.errors import WorkbenchError
 from workbench.processes import ProcessTree
 
-VERSION = "0.1.5-rc.2"
+# The DSH build this integration is written and tested against; reported for
+# debugging, never enforced (a newer DSH is allowed to run).
+DSH_VERSION = "0.1.5-rc.2"
+# Version of the Codex / Claude Code link profile the plugin hands to DSH.
 PLUGIN_VERSION = "0.2.4"
 PORT = int(config.plugin_setting("agents", "port", 3080))
 REMOTE_PORT = int(config.plugin_setting("agents", "remote_port", 8770))
@@ -33,6 +36,9 @@ RUNTIME = config.HOME / "dsh-runtime"
 DSH_HOME = config.HOME / "dsh-home"
 ENV_FILE = config.HOME / "agent-env.json"
 BINARY = RUNTIME / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
+# Installing the runtime is one command, and it has to land exactly where BINARY
+# already looks -- so the same line is shown to whoever hits the missing piece.
+INSTALL = 'npm install --prefix "%s" @deepseek-ai/dsh' % RUNTIME
 
 _READY_TIMEOUT = 90.0
 # Re-entrant: ensure() reports through status() while it still holds the lock.
@@ -94,6 +100,15 @@ def available() -> bool:
     return BINARY.is_file() and shutil.which("node") is not None
 
 
+def reason() -> str:
+    """The single line that fixes an unavailable plugin, for the shell to show."""
+    if shutil.which("node") is None:
+        return "未找到 Node.js：装好 18 以上版本，再执行 " + INSTALL
+    if not BINARY.is_file():
+        return "未安装 DSH 运行时：执行 " + INSTALL
+    return ""
+
+
 def _assert_port_free() -> None:
     """Fail with a readable message instead of a raw socket error."""
     try:
@@ -146,7 +161,7 @@ def status() -> dict:
         alive = process is not None and process.poll() is None
         return {"ready": bool(alive and _state["ready"]), "running": alive,
                 "error": _state["error"], "started": _state["started"],
-                "version": VERSION, "claude_plugin": PLUGIN_VERSION,
+                "version": DSH_VERSION, "claude_plugin": PLUGIN_VERSION,
                 "codex_plugin": PLUGIN_VERSION, "port": PORT,
                 "provider": "deepseek-official", "model": "deepseek-flash",
                 "installed": available()}
@@ -157,7 +172,7 @@ def ensure() -> dict:
     if not available():
         with _lock:
             _state.update(process=None, ready=False,
-                          error="DSH 尚未安装到 %s" % RUNTIME)
+                          error=reason() or "DSH 尚未安装到 %s" % RUNTIME)
         return status()
     with _lock:
         process = _state["process"]
