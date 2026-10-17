@@ -1,0 +1,10 @@
+{
+  "id": "agents",
+  "name": "AI 对话",
+  "description": "完整的 DSH 工作区，可接入 Codex 与 Claude Code。",
+  "icon": "bot",
+  "kind": "iframe",
+  "entry": "/agents/",
+  "routes": ["/agents", "/api/agents"],
+  "module": "agents"
+}

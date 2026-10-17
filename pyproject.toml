@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentworkbench"
+version = "0.1.0"
+description = "A small self-hosted workbench that hosts independent plugins for remote use over a private network."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "AgentWorkbench contributors" }]
+keywords = ["workbench", "plugins", "remote", "tailscale", "zotero", "vscode"]
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+# The host and every bundled plugin use the standard library only.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+workbench = "workbench.server:main"
+
+[tool.setuptools]
+packages = ["workbench", "plugins", "plugins.agents", "plugins.zotero", "plugins.vscode"]
+
+[tool.pytest.ini_options]
+# Without this, a bare ``pytest`` walks into installed runtimes (a VS Code server
+# or a DSH install under data/) and collects their vendored tests.
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]

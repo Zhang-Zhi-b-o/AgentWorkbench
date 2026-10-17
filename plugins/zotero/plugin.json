@@ -1,0 +1,10 @@
+{
+  "id": "zotero",
+  "name": "Zotero 阅读",
+  "description": "浏览书库、搜索文献、继续阅读 PDF，并对选中段落划词翻译。",
+  "icon": "book",
+  "kind": "iframe",
+  "entry": "/plugins/zotero/",
+  "routes": ["/api/zotero"],
+  "module": "zotero"
+}

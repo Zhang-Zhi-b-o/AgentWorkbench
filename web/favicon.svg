@@ -1,0 +1,10 @@
+<!-- 工作台标识：单色“工”字形，随系统深浅色调整明度。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="工作台">
+  <title>工作台</title>
+  <style>g{fill:#185d49}@media (prefers-color-scheme:dark){g{fill:#83d6b7}}</style>
+  <g>
+    <rect x="6" y="6.5" width="20" height="3.4" rx="1.7"/>
+    <rect x="6" y="22.1" width="20" height="3.4" rx="1.7"/>
+    <rect x="14.3" y="6.5" width="3.4" height="19" rx="1.7"/>
+  </g>
+</svg>

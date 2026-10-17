@@ -1,0 +1,353 @@
+/*!
+ * Agent Hub — touch layer for the embedded Zotero reader.
+ *
+ * 这个文件由 reader.html 直接引入，因此它作用于「阅读器 iframe 内部」：
+ * 官方 Zotero reader 是桌面 UI（reader.css 里没有任何宽度断点），而 App 侧
+ * 只在 `@media (max-width:700px)` 里补了一次工具栏重排 —— iPad 的全部宽度
+ * （768/810/834/1024）都不命中，所以 iPad 一直跑桌面布局：鼠标尺寸按钮、
+ * hover 菜单、单行工具栏。
+ *
+ * 这里把补偿条件改成「窄屏 **或** 粗指针」，并把触控目标抬到 44px。
+ * 选择器一律带 `html body` 前缀 + `!important`：App 的覆盖样式是在 iframe
+ * onLoad 时注入的，顺序不稳定，靠特异性保证我们稳定胜出。
+ */
+
+/* ── 1. 视口高度与安全区 ─────────────────────────────────────────────
+ * reader.css 用 100vh 和 height:100% 的链条，iOS 上地址栏/键盘会把底部顶掉。
+ * 统一换成 dvh，并给刘海屏留 inset。 */
+html body {
+	height: 100dvh !important;
+	min-height: 100dvh !important;
+	overscroll-behavior: none;
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+html body #primary-view,
+html body #secondary-view {
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── 2. 触控布局：窄屏或粗指针（iPad 也命中）──────────────────────── */
+@media (max-width: 1024px), (pointer: coarse) {
+	/* 两行工具栏：导航一行、工具/动作一行。高度写死是必须的：
+	   reader 用固定 top 定位 split-view，两者必须一致。 */
+	html body .toolbar {
+		display: grid !important;
+		grid-template-columns: minmax(0, 1fr) auto !important;
+		grid-template-areas: "navigation navigation" "tools actions" !important;
+		height: 96px !important;
+		min-height: 96px !important;
+		padding: env(safe-area-inset-top, 0px) 8px 0 !important;
+		gap: 0 !important;
+	}
+
+	html body .toolbar > .start {
+		grid-area: navigation;
+		min-width: 0;
+		gap: 2px;
+		justify-content: space-between;
+	}
+
+	html body .toolbar > .center {
+		grid-area: tools;
+		min-width: 0;
+		gap: 2px;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	html body .toolbar > .center::-webkit-scrollbar {
+		display: none;
+	}
+
+	html body .toolbar > .end {
+		grid-area: actions;
+		gap: 2px;
+	}
+
+	html body .toolbar .start .divider,
+	html body .toolbar > .center .divider {
+		display: none !important;
+	}
+
+	/* 触控目标：44×44 是 Apple HIG 的下限，比原来的 36px 高一半。 */
+	html body .toolbar-button {
+		flex-shrink: 0;
+		min-width: 44px !important;
+		min-height: 44px !important;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		touch-action: manipulation;
+	}
+
+	html body .toolbar .toolbar-dropdown-button {
+		width: 44px !important;
+		min-height: 44px !important;
+	}
+
+	html body .toolbar #pageNumber {
+		width: 52px !important;
+		padding: 0 4px !important;
+		/* 16px 以上：小于 16px 时 iOS 聚焦输入框会自动放大整页。 */
+		font-size: 16px !important;
+		flex-shrink: 0;
+	}
+
+	html body .toolbar #numPages {
+		white-space: nowrap;
+		font-size: 12px !important;
+		flex: 0 0 auto !important;
+	}
+
+	html body .toolbar #numPages > div {
+		position: static;
+	}
+
+	/* 工具栏是 96px，split-view 必须跟着让位，否则内容被压在工具栏下。
+	 * 高度用 calc 扣掉工具栏：只设 top 不设 height 会让正文溢出到屏幕外。 */
+	html body #split-view,
+	html body .split-view {
+		top: 96px !important;
+		height: calc(100dvh - 96px) !important;
+	}
+
+	html body #primary-view,
+	html body #secondary-view {
+		height: calc(100dvh - 96px) !important;
+	}
+
+	/* ── 侧栏改底部抽屉 ────────────────────────────────────────────
+	 * 手机上 280px 侧栏会吃掉 85% 宽度，把正文挤没。改成从底部升起的抽屉，
+	 * 正文保持整宽；竖屏横屏都不再挤压阅读区。 */
+	html body #sidebarContainer {
+		position: fixed !important;
+		inset: auto 0 0 0 !important;
+		width: 100% !important;
+		max-height: 72dvh !important;
+		border-radius: 16px 16px 0 0 !important;
+		border-top: 1px solid rgba(127, 127, 127, 0.24) !important;
+		box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.22) !important;
+		padding-bottom: env(safe-area-inset-bottom, 0px);
+		z-index: 60;
+	}
+
+	html body.sidebar-open #split-view,
+	html body.sidebar-open .split-view {
+		inset-inline-start: 0 !important;
+	}
+
+	/* ── 阅读器自己的弹层（选区/批注/工具）要能被拇指点到 ────────── */
+	html body .utility-popup,
+	html body .selection-popup,
+	html body .annotation-popup {
+		max-width: calc(100vw - 16px) !important;
+		font-size: 14px;
+	}
+
+	html body .selection-popup .toolbar-button {
+		min-width: 44px !important;
+		min-height: 44px !important;
+	}
+
+	/* 表单控件一律 ≥16px，避免 iOS 聚焦时整页缩放 */
+	html body input,
+	html body textarea,
+	html body select {
+		font-size: 16px !important;
+	}
+
+	/* 桌面 hover 才可见的菜单，触控下改为常显可点 */
+	html body .toolbar .toolbar-dropdown-menu {
+		min-width: 200px;
+	}
+
+	html body .toolbar .toolbar-dropdown-menu button,
+	html body .toolbar .toolbar-dropdown-menu .row {
+		min-height: 44px;
+	}
+}
+
+/* 极窄屏（手机横置/分屏）再压一行，保证工具栏不溢出 */
+@media (max-width: 420px) {
+	html body .toolbar {
+		height: 92px !important;
+		min-height: 92px !important;
+	}
+
+	html body #split-view,
+	html body .split-view {
+		top: 92px !important;
+		height: calc(100dvh - 92px) !important;
+	}
+
+	html body #primary-view,
+	html body #secondary-view {
+		height: calc(100dvh - 92px) !important;
+	}
+}
+
+/* ── 3. 划词翻译气泡与结果卡片（本文件自有组件，无冲突）─────────────
+ * 结果就地呈现：不再跳 App 的 textarea 面板，选完文字点一下就看到译文。 */
+#ah-bubble {
+	position: fixed;
+	z-index: 2147483000;
+	display: none;
+	align-items: center;
+	gap: 2px;
+	padding: 3px;
+	border-radius: 12px;
+	background: var(--dsh-color-bg, #1f2225);
+	border: 1px solid rgba(127, 127, 127, 0.32);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+	font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+#ah-bubble[data-open="true"] {
+	display: flex;
+}
+
+#ah-bubble button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: 9px;
+	background: transparent;
+	color: #f2f4f6;
+	font: inherit;
+	font-size: 15px;
+	line-height: 1;
+	touch-action: manipulation;
+	cursor: pointer;
+}
+
+#ah-bubble button:hover,
+#ah-bubble button:active {
+	background: rgba(127, 127, 127, 0.28);
+}
+
+#ah-bubble button[disabled] {
+	opacity: 0.55;
+	cursor: default;
+}
+
+#ah-card {
+	position: fixed;
+	z-index: 2147483000;
+	display: none;
+	flex-direction: column;
+	width: min(92vw, 440px);
+	max-height: min(60dvh, 460px);
+	overflow: hidden;
+	border-radius: 14px;
+	background: var(--dsh-color-bg, #1f2225);
+	border: 1px solid rgba(127, 127, 127, 0.32);
+	box-shadow: 0 10px 32px rgba(0, 0, 0, 0.34);
+	color: #eef1f4;
+	font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+	font-size: 15px;
+	line-height: 1.55;
+}
+
+#ah-card[data-open="true"] {
+	display: flex;
+}
+
+#ah-card .ah-card-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 10px 8px 12px;
+	border-bottom: 1px solid rgba(127, 127, 127, 0.22);
+	font-size: 12px;
+	opacity: 0.85;
+}
+
+#ah-card .ah-card-head strong {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+#ah-card .ah-card-actions {
+	display: flex;
+	gap: 2px;
+}
+
+#ah-card .ah-card-actions button {
+	min-width: 40px;
+	min-height: 36px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 12px;
+	touch-action: manipulation;
+	cursor: pointer;
+}
+
+#ah-card .ah-card-actions button:hover,
+#ah-card .ah-card-actions button:active {
+	background: rgba(127, 127, 127, 0.26);
+}
+
+#ah-card .ah-card-body {
+	padding: 10px 12px 12px;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	white-space: pre-wrap;
+	word-break: break-word;
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+#ah-card .ah-card-body[data-state="loading"]::after {
+	content: "";
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	margin-left: 6px;
+	border: 2px solid currentColor;
+	border-top-color: transparent;
+	border-radius: 50%;
+	vertical-align: -1px;
+	animation: ah-spin 0.7s linear infinite;
+}
+
+#ah-card .ah-card-body[data-state="error"] {
+	color: #ff8b84;
+}
+
+#ah-card .ah-card-foot {
+	padding: 0 12px 10px;
+	font-size: 11px;
+	opacity: 0.6;
+}
+
+@keyframes ah-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#ah-card .ah-card-body[data-state="loading"]::after {
+		animation: none;
+	}
+}
+
+/* 触控下由本层接管划词入口，隐藏 App 注入的桌面尺寸按钮，避免出现两个「翻译」。 */
+@media (pointer: coarse) {
+	html body .hub-translate-selection {
+		display: none !important;
+	}
+}

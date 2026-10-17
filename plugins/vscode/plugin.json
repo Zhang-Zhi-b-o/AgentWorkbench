@@ -1,0 +1,10 @@
+{
+  "id": "vscode",
+  "name": "编辑器",
+  "description": "在新标签页打开本机的 VS Code Web。",
+  "icon": "code",
+  "kind": "link",
+  "entry": "/vscode/",
+  "routes": ["/vscode", "/api/vscode"],
+  "module": "vscode"
+}
