@@ -5,7 +5,7 @@
   const $ = (id) => document.getElementById(id);
   const nav = $('navTabs'), grid = $('pluginGrid'), views = $('pluginViews'), home = $('homeView');
   const count = $('pluginCount'), errorBox = $('loadError'), errorText = $('loadErrorText');
-  const toggle = $('navToggle'), current = $('navCurrent'), navBox = $('pluginNav');
+  const toggle = $('navToggle'), navBox = $('pluginNav');
   const S = { plugins: [], byId: new Map(), views: new Map(), loaded: false };
   let collapsed = readCollapsed();
 
@@ -51,18 +51,12 @@
   function nameOf(plugin) { return typeof plugin.name === 'string' && plugin.name.trim() ? plugin.name : plugin.id; }
   function hashOf(id) { return '#' + encodeURIComponent(id); }
 
-  // 按钮只有图标（方向由 CSS 旋转），文案留在无障碍属性里；收起后顶栏那一行
-  // 换成「当前在哪个插件」，所以标签条可以整条让位。
+  // 按钮只有图标（方向由 CSS 旋转），文案留在无障碍属性里；收起后整条顶栏
+  // 都收成屏幕最上沿的手柄，所以文案要说清点它是为了展开。
   function updateCollapsedChrome() {
-    const plugin = S.activeId ? S.byId.get(S.activeId) : null;
     const label = collapsed ? '展开插件导航' : '收起插件导航';
     toggle.setAttribute('aria-label', label);
     toggle.title = label;
-    current.replaceChildren();
-    if (!collapsed) { current.hidden = true; return; }
-    current.append(icon(plugin ? plugin.icon : 'grid'),
-      el('span', 'nav-current-label', plugin ? nameOf(plugin) : '插件导航'));
-    current.hidden = false;
   }
   function applyCollapsed() {
     document.documentElement.classList.toggle('nav-collapsed', collapsed);
@@ -207,7 +201,6 @@
     else if (rect.right > box.right - edge) nav.scrollLeft += rect.right - (box.right - edge);
   }
   function markActive(id) {
-    S.activeId = id || null;
     nav.querySelectorAll('.nav-tab').forEach((tab) => {
       if (tab.dataset.pluginId !== id) { tab.removeAttribute('aria-current'); return; }
       tab.setAttribute('aria-current', 'page');
