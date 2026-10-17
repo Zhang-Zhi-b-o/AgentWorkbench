@@ -70,7 +70,6 @@
     for (let i = 0; i < 3; i += 1) {
       const card = el('div', 'skeleton-card');
       card.setAttribute('aria-hidden', 'true');
-      card.append(el('span'), el('i'), el('i'), el('i'));
       grid.append(card);
     }
     home.hidden = false;
@@ -158,7 +157,7 @@
     grid.hidden = S.plugins.length === 0;
     $('homeEmpty').hidden = S.plugins.length > 0;
     grid.setAttribute('aria-busy', 'false');
-    S.plugins.forEach((plugin, index) => {
+    S.plugins.forEach((plugin) => {
       const canUse = ready(plugin), name = nameOf(plugin);
       const card = document.createElement(canUse ? 'a' : 'div');
       card.className = 'plugin-card' + (canUse ? '' : ' is-disabled');
@@ -171,7 +170,7 @@
       const top = el('div', 'plugin-card-top');
       const badge = el('span', 'plugin-icon');
       badge.append(icon(plugin.icon));
-      top.append(badge, el('span', 'plugin-index', String(index + 1).padStart(2, '0')));
+      top.append(badge);
       card.append(top, el('h3', '', name));
       const description = typeof plugin.description === 'string' && plugin.description.trim()
         ? plugin.description : '这个插件还没有填写描述。';
@@ -180,9 +179,8 @@
       else {
         const action = el('div', 'plugin-action');
         action.append(
-          el('span', '', plugin.kind === 'link' ? '在新标签打开' : '进入插件'),
-          el('span', 'plugin-kind', plugin.kind === 'link' ? '外部工具' : '内嵌视图'),
-          el('span', 'plugin-arrow', '→')
+          el('span', '', (plugin.kind === 'link' ? '在新标签打开' : '进入插件') + ' →'),
+          el('span', 'plugin-kind', plugin.kind === 'link' ? '外部工具' : '内嵌视图')
         );
         card.append(action);
       }

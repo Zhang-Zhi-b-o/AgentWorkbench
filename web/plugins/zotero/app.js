@@ -1,331 +1,251 @@
 /* Zotero 插件逻辑：资料库分页、条目详情、翻译与 PDF 阅读器。 */
 (() => {
   'use strict';
+  const $ = (id) => document.getElementById(id);
+  const PAGE = 25, LIMIT = 6000, READER = '/zotero-reader/reader.html';
+  const L = $('libraryView'), DV = $('detailView'), RV = $('readerView'), BB = $('backBtn');
+  const SP = $('servicePill'), ST = $('serviceText');
+  const CL = $('collectionList'), CE = $('collectionError'), CET = $('collectionErrorText'), RC = $('retryCollections');
+  const SI = $('searchInput'), CS = $('clearSearch'), LS = $('listSummary'), AC = $('activeCollection');
+  const LE = $('listError'), LET = $('listErrorText'), RL = $('retryList'), LK = $('listSkeleton');
+  const IL = $('itemList'), ES = $('emptyState'), ET = $('emptyTitle'), EX = $('emptyText');
+  const LW = $('loadMoreWrap'), LM = $('loadMore');
+  const DS = $('detailSkeleton'), DE = $('detailError'), DET = $('detailErrorText'), RD = $('retryDetail');
+  const DC = $('detailContent'), DB = $('detailBack'), DT = $('detailTitle'), DA = $('detailAuthors');
+  const DP = $('detailPublication'), DD = $('detailDate'), DOI = $('detailDoi'), DTags = $('detailTags');
+  const DAb = $('detailAbstract'), PL = $('pdfList');
+  const TC = $('translationConfig'), RTC = $('retryTranslationConfig'), TH = $('translationHint');
+  const TA = $('translateText'), CC = $('charCount'), TL = $('targetLang'), TB = $('translateBtn');
+  const TE = $('translationError'), TET = $('translationErrorText'), RT = $('retryTranslation');
+  const TO = $('translationOutput'), TM = $('translationModel'), CB = $('cacheBadge');
+  const TX = $('translationText'), TT = $('toggleTranslation');
+  const RH = $('readerHost'), RS = $('readerStatus'), RST = $('readerStatusText');
 
-  const PAGE_SIZE = 25;
-  const TRANSLATION_RENDER_LIMIT = 6000;
-  const READER_SRC = '/zotero-reader/reader.html';
-  const TYPE_NAMES = {
-    journalArticle: '期刊论文', book: '图书', bookSection: '图书章节',
-    conferencePaper: '会议论文', thesis: '学位论文', preprint: '预印本',
-    report: '报告', webpage: '网页', manuscript: '手稿'
+  let view = 'library', colls = [], coll = '', q = '', items = [], total = 0, next = 0;
+  let seq = 0, labort = null, loading = false, scroll = 0, retryMode = 'reset', searchTimer = 0;
+  let key = null, pdfs = [], dseq = 0, dabort = null, cabort = null;
+  let configured = false, translating = false, tabort = null, tval = '', tmodel = '', tcached = false, texp = false;
+  let cabort2 = null, frame = null, readerReady = false;
+
+  const mk = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
   };
+  const str = (v) => typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '';
+  const focus = (n) => { if (n) { try { n.focus({ preventScroll: true }); } catch (_) { n.focus(); } } };
 
-  const dom = {};
-  [
-    'libraryView', 'detailView', 'readerView', 'backBtn', 'servicePill', 'serviceText',
-    'collectionList', 'collectionError', 'collectionErrorText', 'retryCollections',
-    'searchInput', 'clearSearch', 'listSummary', 'activeCollection', 'listError',
-    'listErrorText', 'retryList', 'listSkeleton', 'itemList', 'emptyState', 'emptyTitle',
-    'emptyText', 'loadMoreWrap', 'loadMore', 'detailSkeleton', 'detailError',
-    'detailErrorText', 'retryDetail', 'detailContent', 'detailBack', 'detailType',
-    'detailTitle', 'detailAuthors', 'detailPublication', 'detailDate', 'detailDoi',
-    'detailTags', 'detailAbstract', 'pdfList', 'translationConfig',
-    'retryTranslationConfig', 'translationHint', 'translateText', 'charCount',
-    'targetLang', 'translateBtn', 'translationError', 'translationErrorText',
-    'retryTranslation', 'translationOutput', 'translationModel', 'cacheBadge',
-    'translationText', 'toggleTranslation', 'readerHost', 'readerStatus', 'readerStatusText'
-  ].forEach((id) => { dom[id] = document.getElementById(id); });
-
-  const state = {
-    view: 'library',
-    service: 'loading',
-    collections: [],
-    selectedCollection: '',
-    query: '',
-    items: [],
-    total: 0,
-    nextStart: 0,
-    listSeq: 0,
-    listAbort: null,
-    listLoading: false,
-    libraryScroll: 0,
-    activeKey: null,
-    activePdfs: [],
-    detailSeq: 0,
-    detailAbort: null,
-    collectionsAbort: null,
-    configAbort: null,
-    translationConfigured: false,
-    translating: false,
-    translateAbort: null,
-    translationValue: '',
-    translationModelName: '',
-    translationCached: false,
-    translationExpanded: false,
-    readerFrame: null,
-    readerLoaded: false
-  };
-  let searchTimer = 0;
-  let listRetryMode = 'reset';
-
-  class ApiError extends Error {
+  class APIError extends Error {
     constructor(message, status, code) {
       super(message);
-      this.name = 'ApiError';
+      this.name = 'APIError';
       this.status = status || 0;
       this.code = code || '';
     }
   }
-
-  function make(tag, className, text) {
-    const node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text != null) node.textContent = text;
-    return node;
-  }
-
-  function asText(value) {
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number') return String(value);
-    return '';
-  }
-
-  function friendlyError(error) {
-    if (error instanceof ApiError) return error.message;
+  function friendly(error) {
+    if (error instanceof APIError) return error.message;
     if (error && error.name === 'TypeError') return '网络连接失败，请检查网络后重试。';
-    if (error && error.message) return error.message;
-    return '请求失败，请稍后重试。';
+    return error && error.message || '请求失败，请稍后重试。';
   }
-
-  function setService(mode, label) {
-    state.service = mode;
-    dom.servicePill.dataset.state = mode;
-    dom.serviceText.textContent = label;
+  function setService(state, label) {
+    SP.dataset.state = state;
+    ST.textContent = label;
   }
-
-  function setView(view) {
-    state.view = view;
-    dom.libraryView.hidden = view !== 'library';
-    dom.detailView.hidden = view !== 'detail';
-    dom.readerView.hidden = view !== 'reader';
-    dom.backBtn.hidden = view === 'library';
-    dom.backBtn.textContent = view === 'reader' ? '关闭阅读器' : '返回列表';
+  function setView(name) {
+    view = name;
+    L.hidden = name !== 'library';
+    DV.hidden = name !== 'detail';
+    RV.hidden = name !== 'reader';
+    BB.hidden = name === 'library';
+    BB.textContent = name === 'reader' ? '关闭阅读器' : '返回列表';
   }
-
-  function focusNode(node) {
-    if (!node) return;
-    try { node.focus({ preventScroll: true }); } catch (_) { node.focus(); }
-  }
-
-  function apiFetch(url, options, timeoutMs) {
-    const opts = options || {};
-    const timeout = timeoutMs || 18000;
-    const controller = new AbortController();
-    const parent = opts.signal;
+  async function request(url, options, timeout) {
+    const opts = options || {}, controller = new AbortController(), parent = opts.signal;
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeout);
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeout || 18000);
     const relay = () => controller.abort();
     if (parent) {
       if (parent.aborted) controller.abort();
       else parent.addEventListener('abort', relay, { once: true });
     }
-    return fetch(url, Object.assign({}, opts, { signal: controller.signal, cache: 'no-store' }))
-      .catch((error) => {
-        if (timedOut) throw new ApiError('请求超时，请稍后重试。', 0, 'timeout');
-        throw error;
-      })
-      .finally(() => {
-        clearTimeout(timer);
-        if (parent) parent.removeEventListener('abort', relay);
-      });
-  }
-
-  async function readPayload(response) {
-    let data = null;
-    try { data = await response.json(); } catch (_) { /* 空响应也按失败处理 */ }
-    if (!response.ok) {
-      const message = data && typeof data.error === 'string' && data.error.trim()
-        ? data.error
-        : '请求失败（HTTP ' + response.status + '）。';
-      throw new ApiError(message, response.status, data && data.code ? String(data.code) : '');
+    try {
+      return await fetch(url, Object.assign({}, opts, { signal: controller.signal, cache: 'no-store' }));
+    } catch (error) {
+      if (timedOut) throw new APIError('请求超时，请稍后重试。', 0, 'timeout');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      if (parent) parent.removeEventListener('abort', relay);
     }
-    if (!data || typeof data !== 'object') throw new ApiError('服务返回了无法识别的数据。', 0, 'bad_json');
+  }
+  async function read(response) {
+    let data = null;
+    try { data = await response.json(); } catch (_) { /* 空响应 */ }
+    if (!response.ok) {
+      throw new APIError(
+        data && typeof data.error === 'string' && data.error.trim() ? data.error : '请求失败（HTTP ' + response.status + '）。',
+        response.status, data && data.code
+      );
+    }
+    if (!data || typeof data !== 'object') throw new APIError('服务返回了无法识别的数据。', 0, 'bad_json');
     return data;
   }
 
-  /* ---------- 分类 ---------- */
-  function updateActiveCollection() {
-    const found = state.collections.find((item) => item.key === state.selectedCollection);
-    dom.activeCollection.textContent = found ? asText(found.name) || found.key : '全部条目';
+  /* 分类与条目列表 */
+  function updateActive() {
+    const item = colls.find((entry) => entry.key === coll);
+    AC.textContent = item ? str(item.name) || item.key : '全部条目';
   }
-
-  function renderCollections() {
+  function drawCollections() {
     const frag = document.createDocumentFragment();
-    const all = make('button', 'collection-button', '全部条目');
+    const all = mk('button', 'button', '全部条目');
     all.type = 'button';
-    all.dataset.collection = '';
-    all.setAttribute('aria-pressed', String(state.selectedCollection === ''));
-    frag.appendChild(all);
-    state.collections.forEach((collection) => {
-      const button = make('button', 'collection-button', asText(collection.name) || collection.key);
+    all.dataset.k = '';
+    all.setAttribute('aria-pressed', String(coll === ''));
+    frag.append(all);
+    colls.forEach((item) => {
+      const button = mk('button', 'button', str(item.name) || item.key);
       button.type = 'button';
-      button.dataset.collection = collection.key;
-      button.title = asText(collection.name) || collection.key;
-      button.setAttribute('aria-pressed', String(state.selectedCollection === collection.key));
-      frag.appendChild(button);
+      button.dataset.k = item.key;
+      button.title = str(item.name) || item.key;
+      button.setAttribute('aria-pressed', String(coll === item.key));
+      frag.append(button);
     });
-    dom.collectionList.replaceChildren(frag);
-    updateActiveCollection();
+    CL.replaceChildren(frag);
+    updateActive();
   }
-
   async function loadCollections() {
-    if (state.collectionsAbort) state.collectionsAbort.abort();
+    if (cabort) cabort.abort();
     const controller = new AbortController();
-    state.collectionsAbort = controller;
-    dom.collectionError.hidden = true;
-    dom.collectionList.setAttribute('aria-busy', 'true');
+    cabort = controller;
+    CE.hidden = true;
+    CL.setAttribute('aria-busy', 'true');
     try {
-      const response = await apiFetch('/api/zotero/collections', {
+      const data = await read(await request('/api/zotero/collections', {
         headers: { Accept: 'application/json' }, signal: controller.signal
-      });
-      const data = await readPayload(response);
-      if (state.collectionsAbort !== controller) return;
-      state.collections = Array.isArray(data.collections)
-        ? data.collections.filter((item) => item && typeof item.key === 'string')
-        : [];
-      if (state.selectedCollection && !state.collections.some((item) => item.key === state.selectedCollection)) {
-        state.selectedCollection = '';
-      }
-      renderCollections();
+      }));
+      if (cabort !== controller) return;
+      colls = Array.isArray(data.collections) ? data.collections.filter((x) => x && typeof x.key === 'string') : [];
+      if (coll && !colls.some((x) => x.key === coll)) coll = '';
+      drawCollections();
     } catch (error) {
-      if (error.name === 'AbortError' || state.collectionsAbort !== controller) return;
-      state.collections = [];
-      renderCollections();
-      dom.collectionError.hidden = false;
-      dom.collectionErrorText.textContent = '分类服务不可用：' + friendlyError(error);
+      if (error.name === 'AbortError' || cabort !== controller) return;
+      colls = [];
+      drawCollections();
+      CE.hidden = false;
+      CET.textContent = '分类服务不可用：' + friendly(error);
     } finally {
-      if (state.collectionsAbort === controller) {
-        dom.collectionList.setAttribute('aria-busy', 'false');
-        state.collectionsAbort = null;
+      if (cabort === controller) {
+        CL.setAttribute('aria-busy', 'false');
+        cabort = null;
       }
     }
   }
-
-  /* ---------- 条目列表 ---------- */
-  function updateListSummary() {
-    dom.listSummary.textContent = state.items.length
-      ? '共 ' + state.total + ' 条 · 已显示 ' + state.items.length
-      : '共 ' + state.total + ' 条';
+  function updateSummary() {
+    LS.textContent = items.length ? '共 ' + total + ' 条 · 已显示 ' + items.length : '共 ' + total + ' 条';
   }
-
-  function showEmptyState() {
-    dom.emptyState.hidden = false;
-    if (state.query) {
-      dom.emptyTitle.textContent = '没有匹配的条目';
-      dom.emptyText.textContent = '换一个关键词，或切换到全部条目。';
-    } else {
-      dom.emptyTitle.textContent = '此分类还没有条目';
-      dom.emptyText.textContent = '选择其他分类，或稍后再试。';
-    }
+  function showEmpty() {
+    ES.hidden = false;
+    ET.textContent = q ? '没有匹配的条目' : '此分类还没有条目';
+    EX.textContent = q ? '换一个关键词，或切换到全部条目。' : '选择其他分类，或稍后再试。';
   }
-
-  function renderItems() {
+  function drawItems() {
     const frag = document.createDocumentFragment();
-    state.items.forEach((item) => {
-      const wrap = make('div', 'item-entry');
+    items.forEach((item) => {
+      const wrap = mk('div', 'item-entry');
       wrap.setAttribute('role', 'listitem');
-      const button = make('button', 'item-row');
-      button.type = 'button';
-      button.dataset.key = item.key;
-      button.appendChild(make('span', 'item-title', asText(item.title) || '无标题'));
-      button.appendChild(make('span', 'item-authors', asText(item.authors) || '未知作者'));
-      const foot = make('span', 'item-foot');
-      const date = asText(item.date);
-      const publication = asText(item.publication);
-      if (date) foot.appendChild(make('span', '', date));
-      if (publication) foot.appendChild(make('span', 'item-publication', publication));
-      if (item.has_pdf === true) foot.appendChild(make('span', 'pdf-badge', 'PDF'));
-      button.appendChild(foot);
-      wrap.appendChild(button);
-      frag.appendChild(wrap);
+      const row = mk('button', 'item-row');
+      row.type = 'button';
+      row.dataset.key = item.key;
+      row.append(mk('span', 'item-title', str(item.title) || '无标题'));
+      row.append(mk('span', 'item-authors', str(item.authors) || '未知作者'));
+      const foot = mk('span', 'item-foot');
+      if (str(item.date)) foot.append(mk('span', '', str(item.date)));
+      if (str(item.publication)) foot.append(mk('span', 'item-publication', str(item.publication)));
+      if (item.has_pdf === true) foot.append(mk('span', 'pdf-badge', 'PDF'));
+      row.append(foot);
+      wrap.append(row);
+      frag.append(wrap);
     });
-    dom.itemList.replaceChildren(frag);
+    IL.replaceChildren(frag);
   }
-
   async function loadItems(reset) {
-    if (!reset && state.listLoading) return;
+    if (!reset && loading) return;
     clearTimeout(searchTimer);
-    const seq = ++state.listSeq;
-    if (state.listAbort) state.listAbort.abort();
+    const current = ++seq;
+    if (labort) labort.abort();
     const controller = new AbortController();
-    state.listAbort = controller;
-    state.listLoading = true;
-
-    if (reset && state.service !== 'online') setService('loading', '连接中');
-    dom.listError.hidden = true;
-    dom.emptyState.hidden = true;
-    dom.loadMoreWrap.hidden = true;
-    dom.itemList.setAttribute('aria-busy', 'true');
+    labort = controller;
+    loading = true;
+    if (reset && SP.dataset.state !== 'online') setService('loading', '连接中');
+    LE.hidden = true;
+    ES.hidden = true;
+    LW.hidden = true;
+    IL.setAttribute('aria-busy', 'true');
     if (reset) {
-      state.items = [];
-      state.total = 0;
-      state.nextStart = 0;
-      dom.itemList.replaceChildren();
-      dom.listSkeleton.hidden = false;
-      dom.listSummary.textContent = '正在读取条目…';
+      items = [];
+      total = 0;
+      next = 0;
+      IL.replaceChildren();
+      LK.hidden = false;
+      LS.textContent = '正在读取条目…';
     } else {
-      dom.loadMore.disabled = true;
-      dom.loadMore.textContent = '加载中…';
+      LM.disabled = true;
+      LM.textContent = '加载中…';
     }
-
-    const requestedStart = reset ? 0 : state.nextStart;
+    const start = reset ? 0 : next;
     const params = new URLSearchParams();
-    params.set('collection', state.selectedCollection);
-    params.set('start', String(requestedStart));
-    if (state.query) params.set('q', state.query);
-
+    params.set('collection', coll);
+    params.set('start', String(start));
+    if (q) params.set('q', q);
     try {
-      const response = await apiFetch('/api/zotero/items?' + params.toString(), {
+      const data = await read(await request('/api/zotero/items?' + params.toString(), {
         headers: { Accept: 'application/json' }, signal: controller.signal
-      });
-      const data = await readPayload(response);
-      if (seq !== state.listSeq) return;
-      const pageItems = Array.isArray(data.items)
-        ? data.items.filter((item) => item && typeof item.key === 'string')
-        : [];
-      const total = Number.isFinite(Number(data.total))
-        ? Math.max(0, Number(data.total))
-        : state.items.length + pageItems.length;
-      state.items = reset ? pageItems : state.items.concat(pageItems);
-      state.total = total;
-      const returnedStart = Number(data.start);
-      state.nextStart = (Number.isFinite(returnedStart) ? returnedStart : requestedStart) + PAGE_SIZE;
-      renderItems();
-      updateListSummary();
-      dom.listSkeleton.hidden = true;
-      dom.itemList.setAttribute('aria-busy', 'false');
-      dom.loadMoreWrap.hidden = !(pageItems.length > 0 && state.nextStart < state.total);
-      if (!state.items.length) showEmptyState();
+      }));
+      if (current !== seq) return;
+      const page = Array.isArray(data.items) ? data.items.filter((x) => x && typeof x.key === 'string') : [];
+      const count = Number(data.total);
+      total = Number.isFinite(count) ? Math.max(0, count) : items.length + page.length;
+      items = reset ? page : items.concat(page);
+      const returned = Number(data.start);
+      next = (Number.isFinite(returned) ? returned : start) + PAGE;
+      drawItems();
+      updateSummary();
+      LK.hidden = true;
+      IL.setAttribute('aria-busy', 'false');
+      LW.hidden = !(page.length > 0 && next < total);
+      if (!items.length) showEmpty();
       setService('online', '已连接');
-      listRetryMode = reset ? 'reset' : 'append';
+      retryMode = reset ? 'reset' : 'append';
     } catch (error) {
-      if (error.name === 'AbortError' || seq !== state.listSeq) return;
-      dom.listSkeleton.hidden = true;
-      dom.itemList.setAttribute('aria-busy', 'false');
-      dom.listError.hidden = false;
-      dom.listErrorText.textContent = friendlyError(error);
-      dom.loadMoreWrap.hidden = true;
+      if (error.name === 'AbortError' || current !== seq) return;
+      LK.hidden = true;
+      IL.setAttribute('aria-busy', 'false');
+      LE.hidden = false;
+      LET.textContent = friendly(error);
+      LW.hidden = true;
       if (reset) {
-        state.items = [];
-        state.total = 0;
-        dom.itemList.replaceChildren();
-        dom.listSummary.textContent = '读取失败';
-        dom.emptyState.hidden = true;
+        items = [];
+        total = 0;
+        IL.replaceChildren();
+        LS.textContent = '读取失败';
+        ES.hidden = true;
       }
-      listRetryMode = reset ? 'reset' : 'append';
+      retryMode = reset ? 'reset' : 'append';
       setService('error', '服务不可用');
     } finally {
-      if (seq === state.listSeq) {
-        state.listLoading = false;
-        dom.loadMore.disabled = false;
-        dom.loadMore.textContent = '加载更多';
+      if (current === seq) {
+        loading = false;
+        LM.disabled = false;
+        LM.textContent = '加载更多';
       }
     }
   }
 
-  /* ---------- 详情 ---------- */
-  function doiHref(raw) {
+  /* 条目详情 */
+  function doiUrl(raw) {
     let value = raw.trim();
     if (/^https?:\/\//i.test(value)) {
       try {
@@ -337,427 +257,337 @@
     if (!/^10\.\d{4,9}\/.+/i.test(value)) return null;
     return 'https://doi.org/' + value.split('/').map(encodeURIComponent).join('/');
   }
-
-  function renderDoi(raw) {
-    dom.detailDoi.replaceChildren();
-    const text = asText(raw).trim();
-    if (!text) { dom.detailDoi.textContent = '—'; return; }
-    const href = doiHref(text);
-    if (!href) { dom.detailDoi.textContent = text; return; }
-    const link = make('a', '', text);
-    link.href = href;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.referrerPolicy = 'no-referrer';
-    dom.detailDoi.appendChild(link);
-  }
-
-  function renderTags(tags) {
-    dom.detailTags.replaceChildren();
-    (Array.isArray(tags) ? tags : []).forEach((tag) => {
-      const value = asText(tag).trim();
-      if (value) dom.detailTags.appendChild(make('span', 'tag', value));
-    });
-  }
-
-  function renderPdfs(pdfs) {
-    dom.pdfList.replaceChildren();
-    state.activePdfs = (Array.isArray(pdfs) ? pdfs : []).filter((pdf) => pdf && asText(pdf.title));
-    if (!state.activePdfs.length) {
-      dom.pdfList.appendChild(make('p', 'pdf-empty', '此条目暂无 PDF 附件。'));
-      return;
+  function drawDetail(data) {
+    DT.textContent = str(data.title) || '无标题';
+    DA.textContent = str(data.authors) || '未知作者';
+    DP.textContent = str(data.publication) || '—';
+    DD.textContent = str(data.date) || '—';
+    DOI.replaceChildren();
+    const doi = str(data.doi).trim();
+    const href = doi ? doiUrl(doi) : null;
+    if (!doi) DOI.textContent = '—';
+    else if (!href) DOI.textContent = doi;
+    else {
+      const link = mk('a', '', doi);
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.referrerPolicy = 'no-referrer';
+      DOI.append(link);
     }
-    state.activePdfs.forEach((pdf, index) => {
-      const button = make('button', 'pdf-button');
-      button.type = 'button';
-      button.dataset.pdfIndex = String(index);
-      button.appendChild(make('span', 'pdf-button-tag', 'PDF'));
-      button.appendChild(make('span', 'pdf-button-title', asText(pdf.title) || 'PDF 附件'));
-      dom.pdfList.appendChild(button);
+    DTags.replaceChildren();
+    (Array.isArray(data.tags) ? data.tags : []).forEach((tag) => {
+      if (str(tag).trim()) DTags.append(mk('span', 'tag', str(tag)));
     });
+    DAb.textContent = str(data.abstract) || '暂无摘要。';
+    DAb.classList.toggle('muted', !str(data.abstract));
+    PL.replaceChildren();
+    pdfs = (Array.isArray(data.pdfs) ? data.pdfs : []).filter((pdf) => pdf && str(pdf.title));
+    if (!pdfs.length) PL.append(mk('p', 'pdf-empty', '此条目暂无 PDF 附件。'));
+    pdfs.forEach((pdf, index) => {
+      const button = mk('button', 'pdf-button');
+      button.type = 'button';
+      button.dataset.pdf = String(index);
+      button.append(mk('span', 'pdf-tag', 'PDF'), mk('span', 'pdf-title', str(pdf.title)));
+      PL.append(button);
+    });
+    DC.hidden = false;
+    DS.hidden = true;
+    DE.hidden = true;
+    focus(DT);
   }
-
-  function renderDetail(item) {
-    dom.detailTitle.textContent = asText(item.title) || '无标题';
-    dom.detailAuthors.textContent = asText(item.authors) || '未知作者';
-    dom.detailPublication.textContent = asText(item.publication) || '—';
-    dom.detailDate.textContent = asText(item.date) || '—';
-    renderDoi(item.doi);
-    renderTags(item.tags);
-    dom.detailAbstract.textContent = asText(item.abstract) || '暂无摘要。';
-    dom.detailAbstract.classList.toggle('muted', !asText(item.abstract));
-    const type = asText(item.type);
-    dom.detailType.hidden = !type;
-    dom.detailType.textContent = TYPE_NAMES[type] || type;
-    renderPdfs(item.pdfs);
-    dom.detailContent.hidden = false;
-    dom.detailSkeleton.hidden = true;
-    dom.detailError.hidden = true;
-    focusNode(dom.detailTitle);
-  }
-
-  async function loadDetail(key) {
-    if (state.detailAbort) state.detailAbort.abort();
+  async function loadDetail() {
+    if (!key) return;
+    if (dabort) dabort.abort();
     const controller = new AbortController();
-    state.detailAbort = controller;
-    const seq = ++state.detailSeq;
-    dom.detailSkeleton.hidden = false;
-    dom.detailContent.hidden = true;
-    dom.detailError.hidden = true;
-    dom.detailView.scrollTop = 0;
+    dabort = controller;
+    const current = ++dseq;
+    DS.hidden = false;
+    DC.hidden = true;
+    DE.hidden = true;
+    DV.scrollTop = 0;
     try {
-      const response = await apiFetch('/api/zotero/items/' + encodeURIComponent(key), {
+      const data = await read(await request('/api/zotero/items/' + encodeURIComponent(key), {
         headers: { Accept: 'application/json' }, signal: controller.signal
-      });
-      const data = await readPayload(response);
-      if (seq !== state.detailSeq) return;
-      renderDetail(data);
+      }));
+      if (current !== dseq) return;
+      drawDetail(data);
       setService('online', '已连接');
     } catch (error) {
-      if (error.name === 'AbortError' || seq !== state.detailSeq) return;
-      dom.detailSkeleton.hidden = true;
-      dom.detailContent.hidden = true;
-      dom.detailError.hidden = false;
-      dom.detailErrorText.textContent = friendlyError(error);
+      if (error.name === 'AbortError' || current !== dseq) return;
+      DS.hidden = true;
+      DC.hidden = true;
+      DE.hidden = false;
+      DET.textContent = friendly(error);
       setService('error', '服务不可用');
     } finally {
-      if (state.detailAbort === controller) state.detailAbort = null;
+      if (dabort === controller) dabort = null;
     }
   }
-
-  function openDetail(key) {
-    if (!key) return;
-    state.libraryScroll = dom.libraryView.scrollTop;
-    state.activeKey = key;
+  function openItem(itemKey) {
+    if (!itemKey) return;
+    scroll = L.scrollTop;
+    key = itemKey;
     resetTranslation();
     setView('detail');
-    focusNode(dom.backBtn);
-    loadDetail(key);
+    focus(BB);
+    loadDetail();
   }
-
-  function showLibrary() {
-    if (state.detailAbort) state.detailAbort.abort();
-    state.detailAbort = null;
-    state.detailSeq += 1;
+  function backToList() {
+    if (dabort) dabort.abort();
+    dabort = null;
+    dseq += 1;
     resetTranslation();
     setView('library');
-    const activeKey = state.activeKey;
+    const active = key;
     requestAnimationFrame(() => {
-      dom.libraryView.scrollTop = state.libraryScroll;
-      if (activeKey) {
-        const row = Array.from(dom.itemList.querySelectorAll('.item-row'))
-          .find((button) => button.dataset.key === activeKey);
-        if (row) focusNode(row);
-      }
+      L.scrollTop = scroll;
+      const row = Array.from(IL.querySelectorAll('.item-row')).find((x) => x.dataset.key === active);
+      if (row) focus(row);
     });
   }
 
-  /* ---------- 阅读器 ---------- */
-  function ensureReaderFrame() {
-    if (state.readerFrame) return;
-    const frame = document.createElement('iframe');
-    frame.className = 'reader-frame';
-    frame.title = 'PDF 阅读器';
-    frame.src = READER_SRC;
-    frame.hidden = true;
-    const spinner = dom.readerStatus.querySelector('.spinner');
-    const slowTimer = setTimeout(() => {
-      if (!state.readerLoaded) {
-        if (spinner) spinner.hidden = true;
-        dom.readerStatusText.textContent = '阅读器仍在载入，可稍候或返回详情。';
-      }
-    }, 20000);
-    frame.addEventListener('load', () => {
-      clearTimeout(slowTimer);
-      state.readerLoaded = true;
-      frame.hidden = false;
-      if (state.view === 'reader') dom.readerStatus.hidden = true;
-    });
-    frame.addEventListener('error', () => {
-      clearTimeout(slowTimer);
-      if (spinner) spinner.hidden = true;
-      dom.readerStatus.hidden = false;
-      dom.readerStatusText.textContent = '阅读器载入失败，请返回详情重试。';
-    });
-    dom.readerHost.appendChild(frame);
-    state.readerFrame = frame;
-  }
-
-  function openReader() {
-    setView('reader');
-    ensureReaderFrame();
-    if (state.readerLoaded) dom.readerStatus.hidden = true;
-    else {
-      dom.readerStatus.hidden = false;
-      dom.readerFrame.hidden = true;
-    }
-    focusNode(dom.backBtn);
-  }
-
-  function closeReader() {
-    if (state.view !== 'reader') return;
-    setView('detail');
-    focusNode(dom.detailTitle);
-  }
-
-  function handleBack() {
-    if (state.view === 'reader') closeReader();
-    else if (state.view === 'detail') showLibrary();
-  }
-
-  /* ---------- 翻译 ---------- */
-  function setConfigState(text, mode) {
-    dom.translationConfig.textContent = text;
-    dom.translationConfig.dataset.state = mode || '';
-  }
-
+  /* 翻译 */
   function updateTranslateButton() {
-    const text = dom.translateText.value;
-    dom.translateBtn.disabled = !state.translationConfigured || state.translating ||
-      text.trim().length === 0 || text.length > 12000;
-    dom.translateBtn.textContent = state.translating ? '翻译中…' : '翻译';
+    const value = TA.value;
+    TB.disabled = !configured || translating || !value.trim() || value.length > 12000;
+    TB.textContent = translating ? '翻译中…' : '翻译';
   }
-
-  function updateCharCount() {
-    dom.charCount.textContent = dom.translateText.value.length + ' / 12000';
+  function updateCount() {
+    CC.textContent = TA.value.length + ' / 12000';
     updateTranslateButton();
   }
-
-  async function loadTranslationConfig() {
-    if (state.configAbort) state.configAbort.abort();
+  async function loadConfig() {
+    if (cabort2) cabort2.abort();
     const controller = new AbortController();
-    state.configAbort = controller;
-    state.translationConfigured = false;
-    setConfigState('读取中', '');
-    dom.translationHint.textContent = '正在检查翻译服务配置。';
-    dom.retryTranslationConfig.hidden = true;
+    cabort2 = controller;
+    configured = false;
+    TC.textContent = '读取中';
+    TC.dataset.state = '';
+    TH.textContent = '正在检查翻译服务配置。';
+    RTC.hidden = true;
     updateTranslateButton();
     try {
-      const response = await apiFetch('/api/zotero/translation', {
+      const data = await read(await request('/api/zotero/translation', {
         headers: { Accept: 'application/json' }, signal: controller.signal
-      });
-      const data = await readPayload(response);
-      if (state.configAbort !== controller) return;
+      }));
+      if (cabort2 !== controller) return;
       if (data.configured === true) {
-        state.translationConfigured = true;
-        setConfigState('翻译就绪', 'ready');
-        const provider = asText(data.provider);
-        const model = asText(data.model);
-        dom.translationHint.textContent = provider || model
-          ? '服务：' + [provider, model].filter(Boolean).join(' · ')
-          : '翻译服务已就绪。';
+        configured = true;
+        TC.textContent = '翻译就绪';
+        TC.dataset.state = 'ready';
+        const bits = [str(data.provider), str(data.model)].filter(Boolean);
+        TH.textContent = bits.length ? '服务：' + bits.join(' · ') : '翻译服务已就绪。';
       } else {
-        state.translationConfigured = false;
-        setConfigState('未配置', 'error');
-        dom.translationHint.textContent = '服务端尚未配置翻译模型，暂时无法使用翻译。';
+        TC.textContent = '未配置';
+        TC.dataset.state = 'error';
+        TH.textContent = '服务端尚未配置翻译模型，暂时无法使用翻译。';
       }
     } catch (error) {
-      if (error.name === 'AbortError' || state.configAbort !== controller) return;
-      state.translationConfigured = false;
-      setConfigState('不可用', 'error');
-      dom.translationHint.textContent = '翻译服务不可用：' + friendlyError(error);
-      dom.retryTranslationConfig.hidden = false;
+      if (error.name === 'AbortError' || cabort2 !== controller) return;
+      TC.textContent = '不可用';
+      TC.dataset.state = 'error';
+      TH.textContent = '翻译服务不可用：' + friendly(error);
+      RTC.hidden = false;
     } finally {
-      if (state.configAbort === controller) state.configAbort = null;
+      if (cabort2 === controller) cabort2 = null;
       updateTranslateButton();
     }
   }
-
   function resetTranslation() {
-    if (state.translateAbort) state.translateAbort.abort();
-    state.translateAbort = null;
-    state.translating = false;
-    state.translationValue = '';
-    state.translationModelName = '';
-    state.translationCached = false;
-    state.translationExpanded = false;
-    dom.translateText.value = '';
-    dom.translationError.hidden = true;
-    dom.translationErrorText.textContent = '';
-    dom.translationOutput.hidden = true;
-    dom.translationText.textContent = '';
-    dom.translationModel.textContent = '';
-    dom.cacheBadge.hidden = true;
-    dom.toggleTranslation.hidden = true;
-    dom.toggleTranslation.textContent = '展开全部';
-    updateCharCount();
+    if (tabort) tabort.abort();
+    tabort = null;
+    translating = false;
+    tval = '';
+    tmodel = '';
+    tcached = false;
+    texp = false;
+    TA.value = '';
+    TE.hidden = true;
+    TET.textContent = '';
+    TO.hidden = true;
+    TX.textContent = '';
+    TM.textContent = '';
+    CB.hidden = true;
+    TT.hidden = true;
+    TT.textContent = '展开全部';
+    updateCount();
   }
-
   function renderTranslation() {
-    const characters = Array.from(state.translationValue);
-    const overLimit = characters.length > TRANSLATION_RENDER_LIMIT;
-    dom.translationText.textContent = state.translationExpanded
-      ? state.translationValue
-      : characters.slice(0, TRANSLATION_RENDER_LIMIT).join('');
-    dom.translationModel.textContent = state.translationModelName
-      ? '模型：' + state.translationModelName
-      : '模型：未提供';
-    dom.cacheBadge.hidden = !state.translationCached;
-    dom.toggleTranslation.hidden = !overLimit;
-    dom.toggleTranslation.textContent = state.translationExpanded ? '收起译文' : '展开全部';
-    dom.translationOutput.hidden = false;
+    const chars = Array.from(tval);
+    TX.textContent = texp ? tval : chars.slice(0, LIMIT).join('');
+    TM.textContent = tmodel ? '模型：' + tmodel : '模型：未提供';
+    CB.hidden = !tcached;
+    TT.hidden = chars.length <= LIMIT;
+    TT.textContent = texp ? '收起译文' : '展开全部';
+    TO.hidden = false;
   }
-
   function showTranslationError(message) {
-    dom.translationError.hidden = false;
-    dom.translationErrorText.textContent = message;
+    TE.hidden = false;
+    TET.textContent = message;
   }
-
   async function translate() {
-    if (state.translating) return;
-    const text = dom.translateText.value;
-    if (!state.translationConfigured) {
-      showTranslationError('翻译服务尚未配置，暂时无法翻译。');
-      return;
-    }
-    if (text.trim().length === 0) {
-      showTranslationError('请先输入需要翻译的文本。');
-      return;
-    }
-    if (text.length > 12000) {
-      showTranslationError('文本超过 12000 个字符，请删减后再试。');
-      return;
-    }
-    if (state.translateAbort) state.translateAbort.abort();
+    if (translating) return;
+    const value = TA.value;
+    if (!configured) return showTranslationError('翻译服务尚未配置，暂时无法翻译。');
+    if (!value.trim()) return showTranslationError('请先输入需要翻译的文本。');
+    if (value.length > 12000) return showTranslationError('文本超过 12000 个字符，请删减后再试。');
+    if (tabort) tabort.abort();
     const controller = new AbortController();
-    state.translateAbort = controller;
-    state.translating = true;
-    dom.translationError.hidden = true;
+    tabort = controller;
+    translating = true;
+    TE.hidden = true;
     updateTranslateButton();
     try {
-      const response = await apiFetch('/api/zotero/translate', {
+      const data = await read(await request('/api/zotero/translate', {
         method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-Workbench': '1'
-        },
-        body: JSON.stringify({ text, target: dom.targetLang.value, extraPrompt: '' }),
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Workbench': '1' },
+        body: JSON.stringify({ text: value, target: TL.value, extraPrompt: '' }),
         signal: controller.signal
-      }, 90000);
-      const data = await readPayload(response);
-      if (typeof data.translation !== 'string') {
-        throw new ApiError('翻译接口没有返回译文，请稍后重试。', 0, 'bad_translation');
-      }
-      state.translationValue = data.translation;
-      state.translationModelName = asText(data.model);
-      state.translationCached = data.cached === true;
-      state.translationExpanded = false;
+      }, 90000));
+      if (typeof data.translation !== 'string') throw new APIError('翻译接口没有返回译文，请稍后重试。', 0, 'bad');
+      tval = data.translation;
+      tmodel = str(data.model);
+      tcached = data.cached === true;
+      texp = false;
       renderTranslation();
     } catch (error) {
-      if (error.name === 'AbortError') return;
-      showTranslationError(friendlyError(error));
+      if (error.name !== 'AbortError') showTranslationError(friendly(error));
     } finally {
-      if (state.translateAbort === controller) {
-        state.translateAbort = null;
-        state.translating = false;
+      if (tabort === controller) {
+        tabort = null;
+        translating = false;
         updateTranslateButton();
       }
     }
   }
 
-  /* ---------- 事件绑定 ---------- */
-  function bindEvents() {
-    dom.collectionList.addEventListener('click', (event) => {
-      const button = event.target.closest('.collection-button');
-      if (!button) return;
-      const key = button.dataset.collection || '';
-      if (key === state.selectedCollection) return;
-      state.selectedCollection = key;
-      updateActiveCollection();
-      dom.collectionList.querySelectorAll('.collection-button').forEach((item) => {
-        item.setAttribute('aria-pressed', String((item.dataset.collection || '') === key));
-      });
-      state.query = dom.searchInput.value.trim();
-      clearTimeout(searchTimer);
-      loadItems(true);
+  /* PDF 阅读器 */
+  function mountReader() {
+    frame = document.createElement('iframe');
+    frame.className = 'reader-frame';
+    frame.title = 'PDF 阅读器';
+    frame.src = READER;
+    frame.hidden = true;
+    frame.addEventListener('load', () => {
+      readerReady = true;
+      frame.hidden = false;
+      RS.hidden = true;
     });
-
-    dom.searchInput.addEventListener('input', () => {
-      state.query = dom.searchInput.value.trim();
-      dom.clearSearch.hidden = !dom.searchInput.value;
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => loadItems(true), 320);
+    frame.addEventListener('error', () => {
+      const spinner = RS.querySelector('.spinner');
+      if (spinner) spinner.hidden = true;
+      RST.textContent = '阅读器载入失败，请返回详情重试。';
     });
-    dom.searchInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        clearTimeout(searchTimer);
-        state.query = dom.searchInput.value.trim();
-        loadItems(true);
-      }
-    });
-    dom.clearSearch.addEventListener('click', () => {
-      dom.searchInput.value = '';
-      state.query = '';
-      dom.clearSearch.hidden = true;
-      clearTimeout(searchTimer);
-      loadItems(true);
-      focusNode(dom.searchInput);
-    });
-
-    dom.retryList.addEventListener('click', () => loadItems(listRetryMode !== 'append'));
-    dom.loadMore.addEventListener('click', () => loadItems(false));
-
-    dom.itemList.setAttribute('role', 'list');
-    dom.itemList.addEventListener('click', (event) => {
-      const row = event.target.closest('.item-row');
-      if (row) openDetail(row.dataset.key);
-    });
-    dom.itemList.addEventListener('keydown', (event) => {
-      const rows = Array.from(dom.itemList.querySelectorAll('.item-row'));
-      const index = rows.indexOf(document.activeElement);
-      if (index < 0) return;
-      let next = -1;
-      if (event.key === 'ArrowDown') next = Math.min(rows.length - 1, index + 1);
-      else if (event.key === 'ArrowUp') next = Math.max(0, index - 1);
-      else if (event.key === 'Home') next = 0;
-      else if (event.key === 'End') next = rows.length - 1;
-      if (next >= 0) {
-        event.preventDefault();
-        rows[next].focus();
-      }
-    });
-
-    dom.backBtn.addEventListener('click', handleBack);
-    dom.detailBack.addEventListener('click', showLibrary);
-    dom.retryDetail.addEventListener('click', () => {
-      if (state.activeKey) loadDetail(state.activeKey);
-    });
-    dom.retryCollections.addEventListener('click', loadCollections);
-    dom.retryTranslationConfig.addEventListener('click', loadTranslationConfig);
-
-    dom.pdfList.addEventListener('click', (event) => {
-      const button = event.target.closest('.pdf-button');
-      if (!button) return;
-      const pdf = state.activePdfs[Number(button.dataset.pdfIndex)];
-      if (pdf) openReader();
-    });
-
-    dom.translateText.addEventListener('input', updateCharCount);
-    dom.translateBtn.addEventListener('click', translate);
-    dom.retryTranslation.addEventListener('click', translate);
-    dom.toggleTranslation.addEventListener('click', () => {
-      state.translationExpanded = !state.translationExpanded;
-      renderTranslation();
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && state.view === 'reader') {
-        event.preventDefault();
-        closeReader();
-      }
-    });
+    RH.append(frame);
+  }
+  function openReader() {
+    setView('reader');
+    if (!frame) mountReader();
+    if (readerReady) {
+      RS.hidden = true;
+      frame.hidden = false;
+    } else {
+      RS.hidden = false;
+      frame.hidden = true;
+    }
+    focus(BB);
+  }
+  function closeReader() {
+    if (view !== 'reader') return;
+    setView('detail');
+    focus(DT);
+  }
+  function goBack() {
+    if (view === 'reader') closeReader();
+    else if (view === 'detail') backToList();
   }
 
-  function init() {
-    setView('library');
-    setService('loading', '连接中');
-    dom.detailTitle.setAttribute('tabindex', '-1');
-    bindEvents();
-    loadCollections();
-    loadTranslationConfig();
+  /* 事件 */
+  CL.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-k]');
+    if (!button) return;
+    const value = button.dataset.k || '';
+    if (value === coll) return;
+    coll = value;
+    q = SI.value.trim();
+    CL.querySelectorAll('button[data-k]').forEach((item) => {
+      item.setAttribute('aria-pressed', String((item.dataset.k || '') === coll));
+    });
+    updateActive();
+    clearTimeout(searchTimer);
     loadItems(true);
-  }
+  });
+  SI.addEventListener('input', () => {
+    q = SI.value.trim();
+    CS.hidden = !SI.value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadItems(true), 320);
+  });
+  SI.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      clearTimeout(searchTimer);
+      q = SI.value.trim();
+      loadItems(true);
+    }
+  });
+  CS.addEventListener('click', () => {
+    SI.value = '';
+    q = '';
+    CS.hidden = true;
+    clearTimeout(searchTimer);
+    loadItems(true);
+    focus(SI);
+  });
+  RL.addEventListener('click', () => loadItems(retryMode !== 'append'));
+  LM.addEventListener('click', () => loadItems(false));
+  IL.setAttribute('role', 'list');
+  IL.addEventListener('click', (event) => {
+    const row = event.target.closest('.item-row');
+    if (row) openItem(row.dataset.key);
+  });
+  IL.addEventListener('keydown', (event) => {
+    const rows = Array.from(IL.querySelectorAll('.item-row'));
+    const index = rows.indexOf(document.activeElement);
+    if (index < 0) return;
+    let target = -1;
+    if (event.key === 'ArrowDown') target = Math.min(rows.length - 1, index + 1);
+    else if (event.key === 'ArrowUp') target = Math.max(0, index - 1);
+    else if (event.key === 'Home') target = 0;
+    else if (event.key === 'End') target = rows.length - 1;
+    if (target >= 0) {
+      event.preventDefault();
+      rows[target].focus();
+    }
+  });
+  BB.addEventListener('click', goBack);
+  DB.addEventListener('click', backToList);
+  RD.addEventListener('click', loadDetail);
+  RC.addEventListener('click', loadCollections);
+  RTC.addEventListener('click', loadConfig);
+  PL.addEventListener('click', (event) => {
+    const button = event.target.closest('.pdf-button');
+    if (button && pdfs[Number(button.dataset.pdf)]) openReader();
+  });
+  TA.addEventListener('input', updateCount);
+  TB.addEventListener('click', translate);
+  RT.addEventListener('click', translate);
+  TT.addEventListener('click', () => {
+    texp = !texp;
+    renderTranslation();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && view === 'reader') {
+      event.preventDefault();
+      closeReader();
+    }
+  });
 
-  init();
+  DT.setAttribute('tabindex', '-1');
+  setView('library');
+  setService('loading', '连接中');
+  loadCollections();
+  loadConfig();
+  loadItems(true);
 })();

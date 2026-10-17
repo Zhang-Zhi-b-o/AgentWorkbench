@@ -32,10 +32,14 @@ browser ──HTTPS──▶ private reverse proxy ──▶ 127.0.0.1:8768  (ho
 - **One inbound surface.** The host binds `127.0.0.1` only. Remote access is a
   reverse proxy's job (Tailscale serve or any TLS terminator); nothing listens on
   a public interface.
-- **One origin per heavy plugin.** `agents` and `vscode` do not tunnel their
-  traffic through the host: `/agents/` and `/vscode/` answer with a `302` to a
-  separate origin. That keeps the host small and removes a hop from the latency
-  path.
+- **The editor is relayed, not redirected.** `/vscode/` is proxied through the
+  host — workbench assets, webview frames, web sockets and gzip included — so a
+  phone reaches it on the same origin as everything else and needs no second
+  exposed port.
+- **`agents` needs its own origin.** DSH has no base-path option
+  (`dsh web --help` has no such flag), so `/agents/` answers with a `302` to its
+  own loopback port. Point the same reverse proxy at that port once; the other
+  two plugins need nothing extra.
 - **Manifests, not imports.** `GET /api/plugins` returns what the shell renders.
   The routing table is `plugins/*/plugin.json`.
 
@@ -90,13 +94,13 @@ Override the listen port with `WORKBENCH_PORT`.
 ```json
 {
   "agents": { "port": 3080, "remote_port": 8770 },
-  "vscode": { "port": 8799, "remote_port": 8772, "cli": "", "folder": "" },
+  "vscode": { "port": 8799, "cli": "", "folder": "" },
   "zotero": { "autostart": true, "path": "" }
 }
 ```
 
 - `port` — loopback port the plugin owns.
-- `remote_port` — the port your reverse proxy exposes for that plugin.
+- `agents.remote_port` — the port your reverse proxy exposes for DSH's own origin.
 - `vscode.cli` — explicit `code.cmd` path; empty means "search `PATH` and the
   standard install locations".
 - `vscode.folder` — default folder the remote file picker opens.
@@ -117,13 +121,13 @@ The host is loopback-only by design. To reach it from a phone or tablet, put a
 private reverse proxy in front of it. With Tailscale:
 
 ```bash
-# workbench shell
+# the workbench, including the proxied editor — this is the only entry a phone needs
 tailscale serve --bg --https=8769 http://127.0.0.1:8768
-# DSH (its own origin; the plugin adds --trusted-host automatically)
+# the agents plugin's own origin (DSH cannot be served under a path)
 tailscale serve --bg --https=8770 http://127.0.0.1:3080
-# VS Code Web
-tailscale serve --bg --https=8772 http://127.0.0.1:8799
 ```
+
+`setup-remote.ps1` runs both and writes `remote-access.json` for you.
 
 Then write the shell's origin into `remote-access.json`:
 

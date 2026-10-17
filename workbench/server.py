@@ -106,7 +106,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(400, {"error": "invalid JSON body",
                                             "code": "bad_json"})
 
-            request = Request(self, method, path, query, body)
+            request = Request(self, method, path, query, body, raw_query=parsed.query)
             if method == "GET" and path == "/api/health":
                 return request.json(200, {"ok": True, "service": config.SERVICE_NAME,
                                           "version": __version__})

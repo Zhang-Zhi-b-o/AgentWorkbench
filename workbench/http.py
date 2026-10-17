@@ -22,12 +22,20 @@ _CHUNK = 65536
 class Request:
     """One HTTP exchange, as seen by a plugin."""
 
-    def __init__(self, handler, method: str, path: str, query: dict, body: dict):
+    def __init__(self, handler, method: str, path: str, query: dict, body: dict,
+                 raw_query: str = ""):
         self._handler = handler
         self.method = method
         self.path = path
         self.query = query or {}
         self.body = body if isinstance(body, dict) else {}
+        self.raw_query = raw_query
+
+    # -- raw access ------------------------------------------------------
+    @property
+    def raw(self):
+        """The underlying handler, for plugins that relay bytes (proxies, WS)."""
+        return self._handler
 
     # -- inputs ---------------------------------------------------------
     @property
